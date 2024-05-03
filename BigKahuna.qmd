@@ -48,7 +48,7 @@ library("patchwork")
 library("yardstick")
 library("janitor")
 library("performance")
-library("modelsummary")
+# library("modelsummary")
 library("corrr")
 library("gt")
 ```
@@ -364,11 +364,11 @@ gs %>% group_by(tournament) %>%
                         "usopen" = "US Open",
                         "wimbledon" = "Wimbledon")) %>%
   rename("Tournament" = "tournament") %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # width(j = 1, width = 1.2) %>%
-  # width(j = c(2:6), width = .95)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(j = 1, width = 1.2) %>%
+  width(j = c(2:6), width = .95)
 ```
 
 ```{=latex}
@@ -506,13 +506,13 @@ combined <- bind_rows(bet_fit %>% tidy(), ps_fit %>% tidy(), ranking_fit %>% tid
   select(-`Standard Error`, -`Log Odds`)
 
 combined %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>% 
-  # width(j = c(3:5), width = 1) %>%
-  # width(j = 1, width = 1.3) %>%
-  # colformat_double(j = c(3:5), digits = 3) %>%
-  # colformat_double(j = 2, digits = 0)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(j = c(3:5), width = 1) %>%
+  width(j = 1, width = 1.3) %>%
+  colformat_double(j = c(3:5), digits = 3) %>%
+  colformat_double(j = 2, digits = 0)
 ```
 
 ```{=latex}
@@ -1350,10 +1350,10 @@ sets %>%
     `Standard Error` = percent(`Standard Error`, accuracy = .01)) %>%
   select(-prop) %>%
   relocate(`Sample Size`, .after = `Standard Error`) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # width(width = 1.2)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(width = 1.2)
 ```
 
 ```{=latex}
@@ -1388,10 +1388,10 @@ sets %>%
     `Standard Error` = percent(`Standard Error`, accuracy = .01)) %>%
   select(-prop) %>%
   relocate(`Sample Size`, .after = `Standard Error`) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # width(width = 1.2)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(width = 1.2)
 
 # most popular paths...
 # sets %>% mutate(path = str_c(set1, set2, set3, set4, set5)) %>%
@@ -1498,17 +1498,17 @@ The model produces the log odds estimates, which are difficult to interpret, so 
 #| tbl-cap: "Does Momentum Exist - Odds Ratios and Confidence Intervals"
 
 prep_log_table(exist_momentum_men, exist_momentum_women, exist_momentum_combined, 1) %>%
-  gt()
-  # flextable() %>%
-  # add_header_row(
-  #   values = c("", "Combined", "Men", "Women"),
-  #   colwidths = c(1, 3, 3, 3), top = TRUE) %>%
-  # set_header_labels(values = c("Term", "2.5%", "Odds Ratio", "97.5%", "2.5%", "Odds Ratio", "97.5%", "2.5%", "Odds Ratio", "97.5%")) %>%
-  # align(align = "center", part = "all") %>%
-  # width(j = 1, width = 1.1) %>%
-  # width(j = c(2,4,5,7,8,10), width = .38) %>%
-  # width(j = c(3,6,9), width = .85) %>%
-  # colformat_double(j = c(3,6,9), digits = 3)
+  # gt()
+  flextable() %>%
+  add_header_row(
+    values = c("", "Combined", "Men", "Women"),
+    colwidths = c(1, 3, 3, 3), top = TRUE) %>%
+  set_header_labels(values = c("Term", "2.5%", "Odds Ratio", "97.5%", "2.5%", "Odds Ratio", "97.5%", "2.5%", "Odds Ratio", "97.5%")) %>%
+  align(align = "center", part = "all") %>%
+  width(j = 1, width = 1.1) %>%
+  width(j = c(2,4,5,7,8,10), width = .38) %>%
+  width(j = c(3,6,9), width = .85) %>%
+  colformat_double(j = c(3,6,9), digits = 3)
 ```
 
 ```{=latex}
@@ -1536,10 +1536,10 @@ prep_log_table(exist_momentum_men, exist_momentum_women, exist_momentum_combined
   select(Model, `2.5%`, `Odds Ratio`, `97.5%`) %>%
   mutate(
     Model = str_remove(Model, "_2.5%")) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # colformat_double(j = c(2:4), digits = 4)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  colformat_double(j = c(2:4), digits = 4)
 ```
 
 ```{=latex}
@@ -1743,12 +1743,12 @@ momentum_relationship %>%
                   "gradient_backward" = "Backward Momentum")) %>%
   select(-metric) %>%
   rename_with(str_to_title) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # merge_v(j = ~Term) %>%
-  # set_header_labels(values = c("Term", "Combined", "Men", "Women")) %>%
-  # width(j = 1, width = 1.2)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  merge_v(j = ~Term) %>%
+  set_header_labels(values = c("Term", "Combined", "Men", "Women")) %>%
+  width(j = 1, width = 1.2)
 ```
 
 ```{=latex}
@@ -1888,16 +1888,16 @@ In total, we find that converting a break point and striking an ace tend to incr
 #| tbl-cap: "What Impacts Momentum: Point Level"
 
 prep_linear_tables(cov_model, cov_model_close, cov_model_men, cov_model_close_men, cov_model_women, cov_model_close_women) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # merge_v(j = ~Term) %>%
-  # add_header_row(
-  #   values = c("", "Combined", "Men", "Women"),
-  #   colwidths = c(1, 2, 2, 2), top = TRUE) %>%
-  # set_header_labels(values = c("Term", "Full", "Reduced", "Full", "Reduced", "Full", "Reduced")) %>%
-  # # merge_v(j = c(3,5,7,9,11,13)) %>%
-  # width(j = 1, width = 1.3)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  merge_v(j = ~Term) %>%
+  add_header_row(
+    values = c("", "Combined", "Men", "Women"),
+    colwidths = c(1, 2, 2, 2), top = TRUE) %>%
+  set_header_labels(values = c("Term", "Full", "Reduced", "Full", "Reduced", "Full", "Reduced")) %>%
+  # merge_v(j = c(3,5,7,9,11,13)) %>%
+  width(j = 1, width = 1.3)
 ```
 
 ```{=latex}
@@ -1989,15 +1989,15 @@ We find that an interruption in play tends to decrease (-.0051) the future momen
 #| label: tbl-game-level
 #| tbl-cap: "What Impacts Momentum: Game Level"
 prep_linear_tables(game_cov_model, game_cov_model_close, game_cov_model_men, game_cov_model_close_men, game_cov_model_women, game_cov_model_close_women) %>% 
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # add_header_row(
-  #   values = c("", "Combined", "Men", "Women"),
-  #   colwidths = c(1, 2, 2, 2), top = TRUE) %>%
-  # set_header_labels(values = c("Term", "Full", "Reduced", "Full", "Reduced", "Full", "Reduced")) %>%
-  # width(j = 1, width = 1.3) %>% 
-  # merge_v(j = ~Term)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  add_header_row(
+    values = c("", "Combined", "Men", "Women"),
+    colwidths = c(1, 2, 2, 2), top = TRUE) %>%
+  set_header_labels(values = c("Term", "Full", "Reduced", "Full", "Reduced", "Full", "Reduced")) %>%
+  width(j = 1, width = 1.3) %>%
+  merge_v(j = ~Term)
 ```
 
 ```{=latex}
@@ -2265,13 +2265,13 @@ table_interpret %>%
   mutate(across(where(is.numeric), ~round(.x, digits = 3)),
          Sequence = str_replace_all(Sequence, "_", " "),
          Sequence = str_to_title(Sequence)) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # width(j = 1, width = 1.6) %>%
-  # width(j = 5, width = 1) %>%
-  # colformat_double(j = c(2,4), digits = 3) %>%
-  # colformat_double(j = 5, digits = 0)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(j = 1, width = 1.6) %>%
+  width(j = 5, width = 1) %>%
+  colformat_double(j = c(2,4), digits = 3) %>%
+  colformat_double(j = 5, digits = 0)
 ```
 
 ```{=latex}
@@ -2329,12 +2329,12 @@ The Durbin and Watson test statistic measures the impact of serial correlation o
 tibble("Formula" = c("Backward Momentum", "Backward Momentum and Controls"),
        "Durbin Watson Statistic" = c(1.9408, 1.9992),
        "P Value" = c("~0", ".998")) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # width(j = 1, width = 2.5) %>%
-  # width(j = c(2), width = 1.5) %>%
-  # colformat_double(j = 2, digits = 4)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(j = 1, width = 2.5) %>%
+  width(j = c(2), width = 1.5) %>%
+  colformat_double(j = 2, digits = 4)
 ```
 
 ```{=latex}
@@ -2391,7 +2391,7 @@ app_prep_log_table <- function(men_fit, women_fit, combined_fit){
 \begin{spacing}{1}
 ```
 
-```{r, ft.keepnext = FALSE}
+```{r}
 #| label: tbl-full-log-odds
 #| tbl-cap: "Momentum Exist - All Variables"
 
@@ -2413,6 +2413,7 @@ exist_momentum_men %>%
     term = str_remove(term, "tournament"),
     term = str_remove(term, "p1_"),
     term = str_remove_all(term, "1"),
+    term = str_replace_all(term, "(Intercept)", "Intercept"),
     term = str_replace_all(term, "_", " "),
     term = str_replace_all(term, ":", " & "),
     term = str_replace_all(term, "lag gradient backward", "backward momentum"),
@@ -2425,12 +2426,12 @@ exist_momentum_men %>%
   rename("Standard Error" = "std_error") %>%
   relocate(`Log Odds`, .before = `Standard Error`) %>%
   rename_with(str_to_title) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # width(j = 1, width = 2.5) %>%
-  # width(j = 3, width = 1.2) %>%
-  # colformat_double(j = 3, digits = 4)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(j = 1, width = 2.5) %>%
+  width(j = 3, width = 1.2) %>%
+  colformat_double(j = 3, digits = 4)
 ```
 
 ```{=latex}
@@ -2616,11 +2617,11 @@ momentum_relationship %>%
         term = str_replace(term, "Aus", "Australian")) %>%
   select(-metric) %>%
   rename_with(str_to_title) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # merge_v(j = ~Term) %>%
-  # width(j = 1, width = 2.5)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  merge_v(j = ~Term) %>%
+  width(j = 1, width = 2.5)
 ```
 
 ```{=latex}
@@ -2681,10 +2682,10 @@ cov_model %>% check_collinearity() %>%
   arrange(desc(VIF)) %>%
   select(Term, VIF) %>%
   mutate(across(where(is.numeric), ~round(.x, digits = 4))) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # width(j = 1, width = 2)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(j = 1, width = 2)
 ```
 
 ```{=latex}
@@ -2768,15 +2769,15 @@ prep_linear_tables_appendix <- function(comb_full, comb_reduced, men_full, men_r
 }
 
 prep_linear_tables_appendix(cov_model, cov_model_close, cov_model_men, cov_model_close_men, cov_model_women, cov_model_close_women) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # merge_v(j = ~Term) %>%
-  # add_header_row(
-  #   values = c("", "Combined", "Men", "Women"),
-  #   colwidths = c(1, 2, 2, 2), top = TRUE) %>%
-  # set_header_labels(values = c("Term", "Full", "Reduced", "Full", "Reduced", "Full", "Reduced")) %>%
-  # width(j = 1, width = 1.5)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  merge_v(j = ~Term) %>%
+  add_header_row(
+    values = c("", "Combined", "Men", "Women"),
+    colwidths = c(1, 2, 2, 2), top = TRUE) %>%
+  set_header_labels(values = c("Term", "Full", "Reduced", "Full", "Reduced", "Full", "Reduced")) %>%
+  width(j = 1, width = 1.5)
 ```
 
 ```{=latex}
@@ -2835,10 +2836,10 @@ game_cov_model %>% check_collinearity() %>%
   arrange(desc(VIF)) %>%
   select(Term, VIF) %>%
   mutate(across(where(is.numeric), ~round(.x, digits = 4))) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # width(j = 1, width = 1.5)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(j = 1, width = 1.5)
 ```
 
 ```{=latex}
@@ -2874,15 +2875,15 @@ In @tbl-game-full-results, we show the full results for the six game level model
 #| tbl-cap: "Game Level Model Full Results"
 
 prep_linear_tables_appendix(game_cov_model, game_cov_model_close, game_cov_model_men, game_cov_model_close_men, game_cov_model_women, game_cov_model_close_women) %>%
-  gt()
-  # flextable() %>%
-  # align(align = "center", part = "all") %>%
-  # merge_v(j = ~Term) %>%
-  # add_header_row(
-  #   values = c("", "Combined", "Men", "Women"),
-  #   colwidths = c(1, 2, 2, 2), top = TRUE) %>%
-  # set_header_labels(values = c("Term", "Full", "Reduced", "Full", "Reduced", "Full", "Reduced")) %>%
-  # width(j = 1, width = 1.5)
+  # gt()
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  merge_v(j = ~Term) %>%
+  add_header_row(
+    values = c("", "Combined", "Men", "Women"),
+    colwidths = c(1, 2, 2, 2), top = TRUE) %>%
+  set_header_labels(values = c("Term", "Full", "Reduced", "Full", "Reduced", "Full", "Reduced")) %>%
+  width(j = 1, width = 1.5)
 ```
 
 ```{=latex}
