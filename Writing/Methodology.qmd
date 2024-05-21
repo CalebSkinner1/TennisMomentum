@@ -1,0 +1,501 @@
+---
+title: "Methodology"
+format: pdf
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  comment = "#", fig.height = 3, 
+  cache = FALSE,  collapse = TRUE,
+  error = TRUE, echo = FALSE,
+  message = FALSE,
+  warning = FALSE)
+```
+
+```{r libraries, include = FALSE}
+library("arrow")
+library("here")
+library("scales")
+library("flextable")
+library("tidyverse"); theme_set(theme_minimal())
+library("tidymodels")
+library("forstringr")
+library("fpp3")
+library("patchwork")
+```
+
+In the methodology, we describe and justify the processes for visualizing, defining, and measuring momentum.
+
+# Visualizing a Match
+
+Our first step is to create a reproducible method for visualizing and analyzing a entire match. Tennis's hierarchical scoring structure makes it difficult to analyze the ebbs and flows of a match in its natural format. Extracting a match from the confines of its' hierarchical structure provides insight and ease. It is important to note, however, that this extraction assumes that the situations surrounding each point are identical (Klaasen & Magnus, 2001). In reality, certain points are more valuable to players and potentially inspire more energy and effort.
+
+One simple method is to total each players' points won over the course of an entire match. As the match progresses, each player will accumulate point victories. We can compare the difference in the two players' totals and observe each players' point win rate over time. In @fig-cumulative-points below, we use the 2023 Wimbledon Gentlemen's singles final between Novak Djokovic and Carlos Alcaraz as an example. Each vertical gray line represents the start of a new set.
+
+```{r function, include = FALSE}
+gs <- read_parquet(here("grandslams2.parquet"))
+
+grad_update <- function(F, order){
+  n <- length(F)
+  x <- seq(1, n, length.out = n)
+  g <- numeric(n)
+  if(order == 1){
+    g[1] <- NA
+    if (n > 2)
+      g[2:n] <- (F[2:n] - F[1:(n - 1)])/(x[2:n] - x[1:(n - 1)])
+  }
+  if(order == 2){
+    g[1] <- NA
+    g[2] <- (F[2] - F[1])/(x[2] - x[1])
+    # g[n] <- (3*F[n] - 4*F[n - 1] + F[n-2])/(2*(x[n] - x[n - 1]))
+    if (n > 3)
+      g[3:n] <- (3*F[3:n] - 4*F[2:(n-1)] + F[1:(n-2)])/(2*(x[3:n] - x[2:(n - 1)]))
+  }
+  if(order == 3){
+    g[1] <- NA
+    g[2] <- g[2] <- (F[2] - F[1])/(x[2] - x[1])
+    g[3] <- (3*F[3] - 4*F[2] + F[1])/(2*(x[3] - x[2]))
+    if (n > 3)
+      g[4:n] <- (F[4:n] - 3*F[3:(n - 1)] + 3*F[2:(n - 2)] - F[1:(n-3)])/((x[4:n] - x[3:(n - 1)]))
+  }
+  return(g)
+}
+
+cum_points <- function(df, match_code, type) {
+  df <- df %>% filter(match_id == match_code) %>%
+    mutate(
+      diff = p1_points_won - p2_points_won)
+  vlines <- df %>% filter(set_victor != 0) %>% dplyr::select(point_no) %>% slice(1:(n()-1)) %>% pull()
+  
+  service <- df %>%
+    summarise(
+      exp_server = sum(point_victor == server)/n() - sum(point_victor != server)/n()) %>% pull()
+  
+  p1 <- df$player1[1]
+  p2 <- df$player2[1]
+  tourney <- df$tournament[1]
+  gender <- df$sex[1]
+  
+  match <- df %>%
+    mutate(
+      point_margin = diff,
+      serve_adj = if_else(point_victor == 1, 1, -1) + if_else(server == 1, -service, service),
+      adj_point_margin = cumsum(serve_adj)) %>%
+    as_tsibble(index = point_no)
+  
+  ses <- match %>%
+    model(
+      model = ETS(adj_point_margin ~ error("A") + trend("N", alpha = .1) + season("N")))
+  
+  match_flip <- df %>%
+    mutate(
+      point_margin = diff,
+      serve_adj = if_else(point_victor == 1, 1, -1) + if_else(server == 1, -service, service),
+      adj_point_margin = cumsum(serve_adj)) %>%
+    as_tsibble(index = point_no) %>%
+    mutate(flip = n() - point_no + 1) %>%
+    arrange(flip) %>%
+    as_tsibble(index = flip)
+  
+  ses_flip <- match_flip %>%
+    model(
+      model = ETS(adj_point_margin ~ error("A") + trend("N", alpha = .1) + season("N")))
+  
+  if(type == "both"){
+    p <- df %>% ggplot() +
+      geom_line(aes(point_no, p1_points_won, color = 'p1')) +
+      geom_line(aes(point_no, p2_points_won, color = 'p2')) +
+      scale_color_manual(name = 'Player',
+                         breaks = c('p1', 'p2'),
+                         labels = c(p1, p2),
+                         values = c('p1' = 'cadetblue4', 'p2' = 'indianred3')) +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      labs(y = "Points Won", x = "Point Number", title = str_c(p1, " vs. ", p2)) +
+      scale_color_discrete(name = "Player", labels = c(str_extract_part(p1, " ", before = FALSE),
+                                                       str_extract_part(p2, " ", before = FALSE))) +
+      theme(legend.position = c(.9, .2))
+    print(p)
+  }
+  if(type == "difference"){
+    p <- df %>% ggplot(aes(point_no, diff, color = "indianred3")) +
+      geom_line() +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      labs(y = "Point Margin", x = "Point Number", title = str_c(p1, " (+) vs. ", p2, " (-)")) +
+      theme(legend.position = "none")
+    print(p)
+  }
+  if(type == "color serve"){
+    p <- df %>% mutate(
+      server = factor(if_else(server == 1, p1, p2))) %>%
+      ggplot(aes(point_no, diff)) +
+      geom_point(aes(color = server), size = .4) +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      labs(y = "Point Margin", x = "Point Number", title = str_c(p1, " (+) vs. ", p2, " (-)")) +
+      scale_color_discrete(name = "Server",
+                           labels = c(str_extract_part(p2, " ", before = FALSE),
+                                      str_extract_part(p1, " ", before = FALSE))) +
+      theme(legend.position = c(.28, .2))
+    print(p)
+  }
+  if(type == "adjusted"){
+    p <- match %>%
+      ggplot(aes(point_no, adj_point_margin, color = "indianred3")) +
+      geom_line() +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      labs(y = "Adjusted Point Margin", x = "Point Number", title = str_c(p1, " (+) vs. ", p2, " (-)")) +
+      theme(legend.position = "none")
+    print(p)
+  }
+  if(type == "smoothed"){
+    p_back <- components(ses) %>%
+      left_join(fitted(ses), by = c(".model", "point_no")) %>%
+      mutate(adj_point_margin = replace_na(adj_point_margin, 0)) %>%
+      slice(-1) %>%
+      ggplot() +
+      geom_line(aes(point_no, adj_point_margin), color = "cadetblue4") +
+      geom_line(aes(point_no, level), color = "indianred3") +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      labs(x = "", y = "Point Margin", title = "Backward Smoothing")
+    
+    p_forward <- components(ses_flip) %>%
+      left_join(fitted(ses_flip), by = c(".model", "flip")) %>%
+      mutate(
+        adj_point_margin = replace_na(adj_point_margin, 0),
+        point_no = n() - flip) %>%
+      slice(-1) %>%
+      ggplot() +
+      geom_line(aes(point_no, adj_point_margin), color = "cadetblue4") +
+      geom_line(aes(point_no, level), color = "indianred3") +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      labs(x = "Point Number", y = "Point Margin", title = "Forward Smoothing")
+    
+    print(p_back/p_forward)
+  }
+  if(type == "compare orders"){
+    smoothed <- components(ses) %>% slice(-1) %>%
+      dplyr::select(point_no, adj_point_margin, level) %>%
+      # add_row(point_no = 0, point_margin = 0, level = 0) %>%
+      arrange(point_no) %>%
+      mutate(
+        gradient_o1 = grad_update(level, order = 1),
+        gradient_o2 = grad_update(level, order = 2),
+        point_victor = match$point_victor) %>%
+      relocate(point_victor, .before = adj_point_margin)
+    
+    p1 <- ggplot(smoothed) +
+      geom_line(aes(point_no, gradient_o1), color = "forestgreen") +
+      labs(x = "", y = "Backward Momentum", title = "1st Order Approximation") +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      geom_hline(yintercept = 0) +
+      scale_y_continuous(breaks = c(-.6, -.3, 0, .3, .6), limits = c(-.65, .65))
+    # scale_color_manual(
+    #   values = c(gradient_o1 = "forestgreen", gradient_o2 = "limegreen"),
+    #   breaks = c("First Order", "Second Order"),
+    #   labels = c(gradient_o1 = "First Order", gradient_o2 = "Second Order"),
+    #   name = "")
+    
+    p2 <- ggplot(smoothed) +
+      geom_line(aes(point_no, gradient_o2), color = "limegreen") +
+      labs(x = "Point Number", y = "Backward Momentum", title = "2nd Order Approximation") +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      geom_hline(yintercept = 0) +
+      scale_y_continuous(breaks = c(-.6, -.3, 0, .3, .6), limits = c(-.65, .65))
+    # scale_color_manual(
+    #   values = c(gradient_o1 = "forestgreen", gradient_o2 = "limegreen"),
+    #   breaks = c("First Order", "Second Order"),
+    #   labels = c(gradient_o1 = "First Order", gradient_o2 = "Second Order"),
+    #   name = "")
+    
+    print(p1/p2)
+  }
+  if(type == "full viz"){
+    smoothed <- components(ses) %>% slice(-1) %>%
+      dplyr::select(point_no, adj_point_margin, level) %>%
+      # add_row(point_no = 0, point_margin = 0, level = 0) %>%
+      arrange(point_no) %>%
+      mutate(
+        gradient_b1 = grad_update(level, order = 1),
+        point_victor = match$point_victor) %>%
+      relocate(point_victor, .before = adj_point_margin)
+
+    smoothed_flip <- components(ses_flip) %>%
+      slice(-1) %>%
+      select(flip, adj_point_margin, level) %>%
+      # add_row(point_no = 0, adj_point_margin = 0, level = 0) %>%
+      arrange(flip) %>%
+      mutate(
+        gradient_f1 = -grad_update(level, order = 1)) %>%
+      as_tibble() %>%
+      mutate(
+        point_no = n() - flip + 1) %>%
+      arrange(point_no) %>%
+      select(-flip, -adj_point_margin)
+
+    total <- smoothed %>% left_join(smoothed_flip, join_by(point_no))
+
+    p_back <- ggplot(total) +
+      geom_line(aes(point_no, gradient_b1), color = "forestgreen") +
+      labs(x = "", y = "", title = "Backward Momentum") +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      geom_hline(yintercept = 0) +
+      scale_y_continuous(breaks = c(-.6, -.3, 0, .3, .6))
+    
+    p_future <- ggplot(total) +
+      geom_line(aes(point_no, gradient_f1), color = "limegreen") +
+      labs(x = "", y = "", title = "Future Momentum") +
+      geom_vline(xintercept = vlines, color = "darkgrey") +
+      geom_hline(yintercept = 0) +
+      scale_y_continuous(breaks = c(-.6, -.3, 0, .3, .6))
+    
+    p_adj_margin <- ggplot(total) +
+      geom_line(aes(point_no, adj_point_margin), color = "indianred3") +
+      labs(x = "", y = "", title = "Adjusted Point Margin") +
+      geom_vline(xintercept = vlines, color = "darkgrey")
+    
+    print(p_back/p_adj_margin/p_future)
+  }
+}
+```
+
+```{r}
+#| label: fig-cumulative-points
+#| fig-cap: "Cumulative Points Won"
+
+match_id <- "2023-wimbledon-1701"
+cum_points(gs, match_id, "both")
+```
+
+This visualization is helpful, because it quickly displays the general trends of the match. However, small changes in momentum are difficult to identify and nuanced discoveries are lost. Instead, we choose to visualize matches by plotting the difference in the two players' total points won or the **point margin** over time. We can perform this adjustment without losing any information, because the two curves in @fig-cumulative-points are exactly correlated. That is, an increase in Djokovic's point total always corresponds to no change in Alcaraz's point total.
+
+For this reason, the point margin visualization retains and emphasizes both the distance between the two players' scores and the overall trend of the match. In @fig-point-margin, the point margin is positive if Djokovic has won more points that Alcaraz, and the point margin is negative if Alcaraz has won more than Djokovic.
+
+```{r}
+#| label: fig-point-margin
+#| fig-cap: "Point Margin"
+cum_points(gs, match_id, "difference")
+```
+
+The set delineations are helpful for analysis. For example, this visualization demonstrates that Djokovic dominated the first set and the end of the fourth set. Alcaraz, on the other hand, had an advantage during the third set and the early portion of the fifth set.
+
+The cyclical oscillations in the point margin curve in the second set signal the importance of accounting for structural variables. At first, these appear be a series of brief and alternating swings in momentum. Further analysis demonstrates that the point margin tends to increase (in Djokovic's favor) when Djokovic serves and decrease when Alcaraz serves. In @fig-colored-point-margin, we display the same point margin curve overlayed with the server of each point. Notice that sequence of points served by Djokovic tend to be associated with an overall increase in the point margin. This is most obvious in the middle of the second set. Without accounting for the server, it would be easy to conclude that Djokovic and Alcaraz briefly exchanged momentum several times in the second set. Instead, the players simply traded the structural advantage of serving.
+
+```{r}
+#| label: fig-colored-point-margin
+#| fig-cap: "Server Colored"
+cum_points(gs, match_id, "color serve")
+```
+
+# Defining Momentum
+
+We define a player's momentum as the magnitude and direction of his or her performance at any instant in time. We measure this performance through the player's point win rate. Players compete directly, so every victory for a player is a corresponding defeat for his or her opponent. Thus, the momentum of two competing players is always equal and opposite. In colloquial settings, momentum is often portrayed as a binary outcome. A player either has "the momentum" or does not. We, however, choose to assess momentum as a continuous measurement of a player's trajectory in a match.
+
+We propose estimating the players' momentum at any given point with the derivative of the point margin. The derivative of the point margin curve measures the instantaneous rate of change of the players' accumulation of points in the match. A player winning more points will always have a positive slope. Conversely, the slope of a player losing a majority of points will always be negative. In essence, this derivative captures the general trend of a match and extrapolates it from tennis' scoring system.
+
+In practice, we utilize two different methods for estimating the momentum at a given point. The first, **backward momentum**, captures the trend of the match entering into a point. This estimates the total psychological impact of past results, giving greater weight to more recent points. We will use this measurement to assess the existence of momentum. The second method is **future momentum**, which estimates the future trend of the match after a point. This value gives more weight to points in the near future. We will use this measurement to identify features that impact of momentum.
+
+# Server Adjustment
+
+As seen in @fig-colored-point-margin, the server plays a strong role in the slope of the point margin curve. If a player were to serve a sequence of consecutive points, we would expect his or her point margin to increase. This, however, is not momentum, it is a temporary deviation in the match's structure that favors one player.
+
+We adjust for this effect in each match with the **adjusted point margin**. This variable is computed by subtracting the impact of both players' serve for the duration of the match from each point in the point margin curve. The **serve impact** is calculated as the difference between the server's point win rate and returner's point win rate for the duration of the match.
+
+In essence, this adjusted point margin gives more value for winning a point as a returner, because it less likely. It accounts for the natural advantage that the server possesses and extracts true momentum swings from structural conditions.
+
+This server adjustment is similar to a seasonal adjustment of a time series curve (Hyndman & Athanasopoulos, 2021). However, while the serve holds many similarities with a traditional seasonal component, it occurs at irregular intervals and is entirely binary.
+
+In this adjustment, we assume that the serve impact is additive. By additive, we assume the serve impact is not significantly impacted by the size of the point margin. In other words, the effect of serving on the point margin does not naturally change as the point margin increases or decreases. In general, this assumption holds. However, for extreme values of point margin, the serve impact does tend to decrease. See Appendix @fig-serve-impact-pm for more details.
+
+We also assume that the serve impact holds constant over the course of a match. This assumption holds true. See Appendix @fig-serve-impact-match for evidence that the serve impact holds constant over the course of a match. 
+
+@fig-adj-point-margin displays the server-adjusted point margin for the 2023 Wimbledon final. The serve impact for this match is .2216. The server won 61.1% of points and returner 38.9%. This adjusted curve displays the match's trend, isolated from the serve component. Notice that the oscillations in the second set are still present but dampened considerably.
+
+```{r}
+#| label: fig-adj-point-margin
+#| fig-cap: "Adjusted Point Margin"
+
+p1 <- cum_points(gs, match_id, "adjusted")
+p2 <- cum_points(gs, "2023-wimbledon-1404", "adjusted")
+p3 <- cum_points(gs, "2022-wimbledon-1403", "adjusted")
+p4 <- cum_points(gs, "2021-wimbledon-1101", "adjusted")
+
+```
+
+# Exponential Smoothing
+
+In practice, the differentiation of the point margin curve is difficult to estimate. Without the serve adjustment, both the point number and the point margin are discrete integers with an intervals of 1. Even with the serve adjustment, the change of the adjusted point margin is found by $\Delta y = \beta_0 + \beta_1 s_i$ where $\beta_0$ is the point victor with values $\pm1$, $\beta_1$ is the server with values $\pm1$, and $s_i$ is the serve impact. Thus, the pure differentiation at any given point is one of four values, measuring the momentum of a single point. We need a method to smooth the adjusted point margin curve, so the derivative encompasses the value of multiple points.
+
+Most smoothing functions incorporate several observations before and after a given point *t* to appropriately smooth the curve at that point *t*. However, if we differentiate at point *t* and use it to estimate, say, point *t+1*, then our results will be biased. We need an entirely backward (or forward) smoothing method.
+
+We use simple exponential smoothing (Hyndman & Athanasopoulos, 2021; Hyndman, 2023) to produce a smoothed adjusted point margin curve. We use a low smoothing parameter of $\alpha = .1$, so that the smoothed curve accounts for the broad trends of the match. Our goal is not primarily to fit the point margin curve, but rather to give the derivative meaningful values. For this reason, the level of the smoothed curve will often lag behind the actual values (see @fig-b-smoothed-curve). The slope, however, adjusts with the slope of the original curve.
+
+The two methods for estimating momentum necessitate two methods for smoothing the curve. **Backward momentum** uses the traditional simple exponential smoothing (for our purposes, we call this backward smoothing). For **future momentum**, we flip the orientation of simple exponential smoothing and smooth from the right side. In this forward smoothing, the levels are estimated from the last point first. We use the same smoothing parameter of $\alpha = .1$. The equation for the forward smoothing is shown below.
+
+\begin{equation}
+\hat{y}_{t} = \alpha y_{t+1} + \alpha^2 y_{t+2} + \alpha^3 y_{t+3} + ...
+\end{equation}
+
+@fig-smoothed-curve displays the backward and forward smoothing. Notice that the backward smoothing lags behind actual values and the forward smoothing anticipates future values.
+
+```{r, fig.height= 5}
+#| label: fig-smoothed-curve
+#| fig-cap: "Backward Smoothing of Adjusted Point Margin"
+cum_points(gs, match_id, "smoothed")
+```
+
+# Differentiation
+
+We differentiate the smoothed adjusted point margin curves to estimate the momentum at each point in the match. There are three general methods for approximating the instantaneous derivative of a curve: backward, forward, and complete differentiation. Complete differentiation provides the best estimate of the derivative, but the method utilizes future values to estimate the current derivative. For example, using first order complete differentiation, the derivative at point *t* is computed as
+
+\begin{equation}
+y^{'}_{t} = \frac{y_{t+1} - y_{t-1}}{2}
+\end{equation}
+
+Once again, this would introduce bias if $y^{'}_{t}$ is later used to estimate $y_{t+1}$. Instead, we backward differentiate the backward smoothed curve, and forward differentiate the forward smooth curve to maintain our model's integrity. Thus, each derivative of the backward smoothed curve is estimated only with observations before point *t*. In the same way, each derivative of the forward smoothed curve is estimated only with points after point *t*.
+
+We use a simple numerical differentiation for both estimates, because this is the only accessible backward and forward differentiation method. Methods like b-spline are preferred, but their implementation is solely for complete differentiation. The simple numerical differentiation is tantamount to drawing a secant line from point *t-1* to *t*, and using the slope of the secant line to estimate the slope at point *t*.
+
+We compare the first order and second order differentiation methods. The first order backward difference approximation is given by $y^{'}_{t} = y_{t} - y_{t-1}$, and the second order backward difference approximation is given by $y^{'}_{t} = 3y_{t} - 4y_{t-1} + 2y_{t-2}$.
+
+While both methods are viable estimations of the derivative, we find the first order approximation to be less volatile (see @fig-compare-orders). The second order approximation is more reactive to slight changes in the adjusted point margin curve. The variance of the second order approximations is .0573, while the variance of the first order approximations is .0498.
+
+Our understanding is that momentum tends to build slowly over the course of a multitude points, so an estimation of the momentum that is less reactive to solitary points is preferable. For this reason, we utilize the first order approximation. With that being said, the two methods for approximating the derivative are relatively indistinguishable.
+
+In @fig-compare-orders, we display both approximations for the backward momentum at each point. In this case, positive values indicate backward momentum for Djokovic and negative values indicate backward momentum for Alcaraz. Notice that the approximations have nearly identical trends and similar shapes. The second order approximation, however, tends to have steeper spikes, and it reacts more to short runs.
+
+```{r, fig.height= 5}
+#| label: fig-compare-orders
+#| fig-cap: "First Order vs Second Order Approximation"
+cum_points(gs, match_id, "compare orders")
+```
+
+The future momentum is computed in a similar way, using first order approximations. The curve, however, holds the future trend of the match in each point, so it differs from the backward momentum. Again, the future momentum anticipates a change in the adjusted point margin curve, while the backward momentum reacts after the change. We display the backward momentum, adjusted point margin, and future momentum in @fig-full-visualizations.
+
+```{r, fig.height = 7.5}
+#| label: fig-full-visualizations
+#| fig-cap: "Momentum Curves"
+cum_points(gs, match_id, type = "full viz")
+```
+
+# Describing Momentum
+
+Both backward and future momentum are continuous variables with means of 0 that range from -1 to 1. However, about 95% of the values of momentum in our data set range from -.47 to .47. Values of momentum near -1 or 1 are rare. Thus, a value of -.5 represents strong momentum for player 2, and .5 represents strong momentum for player 1. A value of 0 represents neutral momentum. We plot the distributions of the two variables in @fig-momentum-dist. As expected, the variables have nearly identical distributions.
+
+```{r}
+#| label: fig-momentum-dist
+#| fig-cap: "Momentum Distributions"
+
+gs %>% pivot_longer(
+  cols = c(gradient_backward, gradient_forward),
+  names_to = "type", values_to = "momentum") %>%
+  ggplot() +
+  geom_density(aes(x = momentum, color = type)) +
+  scale_color_discrete(name = "",
+                       labels = c("gradient_backward" = "Backward",
+                                  "gradient_forward" = "Future")) +
+  labs(x = "Momentum", y = "") +
+  theme(legend.position = c(.85, .77)) +
+  scale_y_continuous(breaks = NULL)
+```
+
+It is important to note that backward momentum is measured as the momentum entering any given point. That is, the backward momentum at point *t* is the momentum before that point begins. It is a culmination of the results at *t-1*, *t-2*, etc. Future momentum, however, is the opposite. Future momentum is measured as the momentum immediately after the point *t*. Thus, the future momentum is estimated by the results in *t+1*, *t+1*, etc.
+
+Direct interpretations and applications of these momentum values can be difficult to assess. Momentum is the culmination of the results of many points, and representing it in a continuous variable from -1 to 1 can feel abstract. We provide context for these momentum values through concrete examples in @fig-interpretations. Here, we display the range of possible backward momentum values after various outcomes. This helps to bring tangible interpretations for our momentum values. For example, a player's backward momentum, conditional on winning ten points in a row, is an estimated .66. However, the estimate varies substantially; 95% of the values range from .471 to .845. This variation depends on the results of the earlier points in the match and the server of the ten points. Take another example. After a player wins four out of five points, we estimate his or her momentum to be .222, but we can reasonably expect it to fall between -.099 and .542. Again, this variation depends on the server of the five points, order of victory, and results of the preceding points. The full estimates and intervals lie in Appendix @tbl-interpret.
+
+```{r, fig.height = 5}
+#| label: fig-interpretations
+#| fig-cap: "Interpreting Backward Momentum"
+interpret <- gs %>%
+  select(match_id, point_victor, gradient_backward, gradient_forward, point_no) %>%
+  mutate(
+    match_id = str_c(match_id, "_flip"),
+    point_victor = if_else(point_victor == 1, 2, 1),
+    gradient_backward = -gradient_backward,
+    gradient_forward = -gradient_forward) %>%
+  bind_rows(gs %>% select(point_victor, match_id, gradient_backward, gradient_forward, point_no)) %>%
+  group_by(match_id) %>%
+  mutate(
+    point_victor = if_else(point_victor == 2, 0, point_victor),
+    p1_points_won = cumsum(point_victor),
+    fifteen_in_a_row = (p1_points_won - lag(p1_points_won, 15) == 15),
+    sixteen_out_of_twenty = (p1_points_won - lag(p1_points_won, 20) == 16),
+    twelve_out_of_fifteen = (p1_points_won - lag(p1_points_won, 15) == 12),
+    ten_in_a_row = (p1_points_won - lag(p1_points_won, 10) == 10),
+    eight_out_of_ten = (p1_points_won - lag(p1_points_won, 10) == 8),
+    four_out_of_five = (p1_points_won - lag(p1_points_won, 5) == 4),
+    five_in_a_row = (p1_points_won - lag(p1_points_won, 5) == 5),
+    three_in_a_row = (p1_points_won - lag(p1_points_won, 3) == 3)) %>%
+  ungroup() %>%
+  select(gradient_backward, gradient_forward, contains("row"), contains("out_of"), point_no, match_id)
+
+p1 <- bind_rows(
+  interpret %>% filter(fifteen_in_a_row == TRUE) %>% select(gradient_backward, fifteen_in_a_row),
+  interpret %>% filter(ten_in_a_row == TRUE) %>% select(gradient_backward, ten_in_a_row),
+  interpret %>% filter(five_in_a_row == TRUE) %>% select(gradient_backward, five_in_a_row),
+  interpret %>% filter(three_in_a_row == TRUE) %>% select(gradient_backward, three_in_a_row)) %>%
+  mutate(type = case_when(
+    fifteen_in_a_row == TRUE ~ "fifteen",
+    ten_in_a_row == TRUE ~ "ten",
+    five_in_a_row == TRUE ~ "five",
+    three_in_a_row == TRUE ~ "three",
+    .default = NA)) %>%
+  select(gradient_backward, type) %>%
+  ggplot() +
+  geom_density(aes(x = gradient_backward, color = type)) +
+  scale_color_manual(name = "Consecutive Points Won",
+                       labels = c("fifteen" = "15",
+                                  "ten" = "10",
+                                  "five" = "5",
+                                  "three" = "3"),
+                     breaks = c("fifteen",
+                                "ten",
+                                "five",
+                                "three"),
+                       values = c("fifteen" = "chocolate2",
+                                  "ten" = "indianred3",
+                                  "five" = "cadetblue4",
+                                  "three" = "forestgreen")) +
+  labs(x = "", y = "") +
+  theme(legend.position = c(.3, .6)) +
+  scale_y_continuous(breaks = NULL) +
+  scale_x_continuous(limits = c(-.25, 1),
+                     n.breaks = 6)
+
+p2 <- bind_rows(
+    interpret %>% filter(sixteen_out_of_twenty == TRUE) %>% select(gradient_backward, sixteen_out_of_twenty),
+  interpret %>% filter(eight_out_of_ten == TRUE) %>% select(gradient_backward, eight_out_of_ten),
+  interpret %>% filter(twelve_out_of_fifteen == TRUE) %>% select(gradient_backward, twelve_out_of_fifteen),
+  interpret %>% filter(four_out_of_five == TRUE) %>% select(gradient_backward, four_out_of_five)) %>%
+  mutate(type = case_when(
+    sixteen_out_of_twenty == TRUE ~ "16/20",
+    twelve_out_of_fifteen == TRUE ~ "12/15",
+    eight_out_of_ten == TRUE ~ "8/10",
+    four_out_of_five == TRUE ~ "4/5",
+    .default = NA)) %>%
+  select(gradient_backward, type) %>%
+  ggplot() +
+  geom_density(aes(x = gradient_backward, color = type)) +
+  scale_color_manual(name = "Previous Win Rate",
+                     breaks = c("16/20",
+                                "12/15",
+                                "8/10",
+                                "4/5"),
+                     values = c("16/20" = "chocolate2",
+                                "12/15" = "indianred3",
+                                "8/10" = "cadetblue4",
+                                "4/5" = "forestgreen")) +
+  labs(x = "Backward Momentum", y = "") +
+  theme(legend.position = c(.25, .65)) +
+  scale_y_continuous(breaks = NULL) +
+  scale_x_continuous(limits = c(-.25, 1),
+                     n.breaks = 6)
+p1/p2
+```
+
+In @fig-interpretations, we notice two important trends. First, we notice that even sustained dominance is unlikely to bring a player to a momentum of 1. A player, conditional on winning fifteen points in a row, has an estimated momentum of 0.809. The 95% interval ranges from .676 to .922.
+
+Second, momentum is an estimation of long-term trends. Short runs impact the momentum, but not very heavily. Conditional on winning three points in a row, a player's momentum value, lies within the interval of -.119 to .622 in 95% of observations. A short run does not give us a precise estimate of momentum, because the long-term trend is more influential.
+
+In fact, the mean momentum after a player wins twelve out of fifteen points (.482) is higher than the mean momentum of a player winning five points in a row (.419). This demonstrates that sustained long-term winning impacts momentum more than short bursts of dominance. Our measurement of momentum, therefore, is an estimation of the long-term trends in a match.
+
+
+

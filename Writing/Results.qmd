@@ -1,0 +1,775 @@
+---
+title: "Results"
+author: "Caleb Skinner"
+format: pdf
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  comment = "#", fig.height = 3, 
+  cache = FALSE,  collapse = TRUE,
+  error = TRUE, echo = FALSE,
+  message = FALSE)
+```
+
+```{r libraries, include = FALSE}
+library("arrow")
+library("here")
+library("scales")
+library("flextable")
+library("tidyverse"); theme_set(theme_minimal())
+library("tidymodels")
+library("yardstick")
+library("janitor")
+library("performance")
+library("modelsummary")
+```
+
+```{r, include = FALSE}
+set_flextable_defaults(
+  font.size = 10, theme_fun = theme_apa,
+  padding = 6,
+  background.color = "#EFEFEF",
+  text.align = "center")
+```
+
+```{r data, include = FALSE}
+cov <- read_parquet(here("covariates.parquet"))
+gs <- read_parquet(here("grandslams2.parquet"))
+```
+
+# Univariate Analysis of Set Momentum
+
+We begin with an initial descriptive analysis of the effect of momentum on a set-level. In a best-of-five set match, the two players can arrive at the pivotal fifth set in several ways. We hypothesize that the sequence of victories in the first four sets impacts the odds of winning the fifth set.
+
+Our initial descriptive analysis supports this conclusion. Players that win the fourth set win the fifth set 57.6% of the time. Thus, per our interpretation, players who enter the fifth set with momentum tend to win the fifth set more often. Interestingly, this momentum compounds. Players who win the third and fourth set win the fifth set over 60% of the time. See @tbl-five-set-momentum for more details.
+
+```{r}
+sets <- gs %>%
+  filter(sex == 1, last_pt_set == 1) %>%
+  mutate(
+    set1 = if_else(set_no == 1, point_victor, 0),
+    set2 = if_else(set_no == 2, point_victor, 0),
+    set3 = if_else(set_no == 3, point_victor, 0),
+    set4 = if_else(set_no == 4, point_victor, 0),
+    set5 = if_else(set_no == 5, point_victor, 0)) %>%
+  group_by(match_id, match_victor) %>%
+  summarise(
+    set1 = sum(set1),
+    set2 = sum(set2),
+    set3 = sum(set3),
+    set4 = sum(set4),
+    set5 = sum(set5)) %>%
+  mutate(
+      across(match_victor:set5, ~case_when(
+        match_victor == 2 & .x == 1 ~ 2,
+        match_victor == 2 & .x == 2 ~ 1,
+        .default = .x))) %>%
+  select(-match_victor)
+```
+
+```{r}
+#| label: tbl-five-set-momentum
+#| tbl-cap: "Momentum in Five Set Matches"
+sample_size <- sets %>%
+  group_by() %>%
+  summarise(
+    WWLL = sum(str_c(set1, set2, set3, set4) %in% c(1122,2211)),
+    LLWW = sum(str_c(set1, set2, set3, set4) %in% c(1122,2211)),
+    WLWL = sum(str_c(set1, set2, set3, set4) %in% c(1212,2121)),
+    LWLW = sum(str_c(set1, set2, set3, set4) %in% c(1212,2121)),
+    WLLW = sum(str_c(set1, set2, set3, set4) %in% c(1221,2112)),
+    LWWL = sum(str_c(set1, set2, set3, set4) %in% c(1221,2112))) %>%
+  t() %>% data.frame() %>% rownames_to_column() %>%
+  rename("Sequence of Set Outcomes" = "rowname",
+         "Sample Size" = ".")
+
+# winning percentage if...
+sets %>%
+  group_by() %>%
+  summarise(
+    W = sum(set1 == 1)/sum(set1 %in% c(1,2)),
+    L = sum(set1 == 2)/sum(set1 %in% c(1,2)),
+    WW = sum(str_c(set1, set2) == 11)/sum(str_c(set1, set2) %in% c(22,11)),
+    LL = sum(str_c(set1, set2) == 22)/sum(str_c(set1, set2) %in% c(22,11)),
+    WL = sum(str_c(set1, set2) == 12)/sum(str_c(set1, set2) %in% c(12,21)),
+    LW = sum(str_c(set1, set2) == 21)/sum(str_c(set1, set2) %in% c(12,21)),
+    WWL = sum(str_c(set1, set2, set3) == 112)/sum(str_c(set1, set2, set3) %in% c(112,221)),
+    LLW = sum(str_c(set1, set2, set3) == 221)/sum(str_c(set1, set2, set3) %in% c(112,221)),
+    WLW = sum(str_c(set1, set2, set3) == 121)/sum(str_c(set1, set2, set3) %in% c(121,212)),
+    LWL = sum(str_c(set1, set2, set3) == 212)/sum(str_c(set1, set2, set3) %in% c(121,212)),
+    WLL = sum(str_c(set1, set2, set3) == 122)/sum(str_c(set1, set2, set3) %in% c(122,211)),
+    LWW = sum(str_c(set1, set2, set3) == 211)/sum(str_c(set1, set2, set3) %in% c(122,211)),
+    WWLL = sum(str_c(set1, set2, set3, set4) == 1122)/sum(str_c(set1, set2, set3, set4) %in% c(1122,2211)),
+    LLWW = sum(str_c(set1, set2, set3, set4) == 2211)/sum(str_c(set1, set2, set3, set4) %in% c(1122,2211)),
+    WLWL = sum(str_c(set1, set2, set3, set4) == 1212)/sum(str_c(set1, set2, set3, set4) %in% c(1212,2121)),
+    LWLW = sum(str_c(set1, set2, set3, set4) == 2121)/sum(str_c(set1, set2, set3, set4) %in% c(1212,2121)),
+    WLLW = sum(str_c(set1, set2, set3, set4) == 1221)/sum(str_c(set1, set2, set3, set4) %in% c(1221,2112)),
+    LWWL = sum(str_c(set1, set2, set3, set4) == 2112)/sum(str_c(set1, set2, set3, set4) %in% c(1221,2112))) %>%
+  select(WWLL, WLWL, LWWL, WLLW, LWLW, LLWW) %>%
+  t() %>% data.frame() %>% rownames_to_column() %>%
+  rename("Sequence of Set Outcomes" = "rowname",
+         prop = ".") %>%
+  left_join(sample_size, by = join_by(`Sequence of Set Outcomes`)) %>%
+  mutate(
+    `Fifth Set Win Percentage` = percent(prop, accuracy = .01),
+    `Standard Error` = sqrt(prop * (1 - prop)/`Sample Size`),
+    `Standard Error` = percent(`Standard Error`, accuracy = .01)) %>%
+  select(-prop) %>%
+  relocate(`Sample Size`, .after = `Standard Error`) %>%
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(width = 1.2) %>%
+  set_caption("Momentum in Five Set Matches")
+```
+
+@tbl-set-by-set demonstrates each sets' impact on the fifth set. Note that outcomes are conditional on the presence of a fifth set. For example, we find that players winning the fourth set, win the fifth set over 57% of the time. However, players that win the first set only win the fifth set around 44% of the time. Of course, this second scenario implies that the player entered the fifth set having lost lost two of the three previous sets.
+
+Overall, this set-by-set descriptive analysis of momentum suggests that previous results impact players, but at a diminishing rate. Results in set four play a much larger role in the outcome of set five than results in set one.
+
+```{r}
+#| label: tbl-set-by-set
+#| tbl-cap: "Effect on Fifth Set"
+sets %>%
+  group_by() %>%
+  summarise(
+    "Win 4th set" = sum(set5 == 1&set4 == 1)/sum(set5 == 1),
+    "Win 3rd set" = sum(set5 == 1&set3 == 1)/sum(set5 == 1),
+    "Win 2nd set" = sum(set5 == 1&set2 == 1)/sum(set5 == 1),
+    "Win 1st set" = sum(set5 == 1&set1 == 1)/sum(set5 == 1)) %>%
+  t() %>% data.frame() %>% rownames_to_column() %>%
+  rename("Result" = "rowname",
+         "prop" = ".") %>%
+  mutate(
+    `Sample Size` = sum(sets$set5 == 1),
+    `Fifth Set Win Percentage` = percent(prop, accuracy = .01),
+    `Standard Error` = sqrt(prop * (1 - prop)/`Sample Size`),
+    `Standard Error` = percent(`Standard Error`, accuracy = .01)) %>%
+  select(-prop) %>%
+  relocate(`Sample Size`, .after = `Standard Error`) %>%
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  width(width = 1.2) %>%
+  set_caption("Momentum in Five Set Matches")
+
+# most popular paths...
+# sets %>% mutate(path = str_c(set1, set2, set3, set4, set5)) %>%
+#   distinct(path, .keep_all = TRUE) %>%
+#   group_by(path) %>%
+#   summarise(Count = n()) %>%
+#   arrange(desc(Count))
+```
+
+# Does Momentum Exist?
+
+Before we can identify the forces that impact momentum, we must first show that momentum exists. That is, we must demonstrate that the direction of a players' prior performance impacts his future performance. We measure a players' performance up to a given point as the backward differentiation of the smoothed adjusted point margin curve at that point (see Methodology). We term this backward momentum. Our model assesses the effect of backward momentum on the odds of winning the next point. If backward momentum has a meaningful positive relationship with the winner of the next point, we can surmise that a player's success entering a point has an impact on their future success. This would provide evidence for the existence of momentum.
+
+We assess this relationship using a logistic regression model (Hosmer, Lemeshow, & Sturdivant, 2013; Kuhn et al., 2020). While logistic regression may not necessarily provide the most accurate prediction for backward momentum, we are more interested in evaluating the estimates' coefficients than pure prediction power. We interact the sex of the players with backward momentum, because we are also interested in understanding male and female's different reactions to momentum. We include the combined results of male and female players as well as their individual results.
+
+We control for four structural variables that impact the overall probability of winning a given point. The pre-match betting odds capture any perceived skill imbalance between the two players before the match begins. The server of the point accounts for the large competitive advantage when a player serves a point. We interact the **tournament** categorical covariate and the **sex** indicator variable with the server, because these factors determine the magnitude of the server's advantage (see Data). The dependent variable is **point_victor**.
+
+```{r modelling}
+lr_mod <- logistic_reg() %>% 
+  set_engine("glm")
+
+exist_momentum_men <- lr_mod %>%
+  fit(point_victor ~ tournament:sex:server + lag1_gradient_backward:sex + lag1_gradient_backward + bet_odds*sex, data = cov)
+
+cov2 <- cov %>% mutate(sex = factor(sex, levels = c("women", "men")))
+
+exist_momentum_women <- lr_mod %>%
+  fit(point_victor ~ tournament:sex:server + lag1_gradient_backward:sex + lag1_gradient_backward + bet_odds*sex, data = cov2)
+
+exist_momentum_combined <- lr_mod %>%
+  fit(point_victor ~ tournament:sex:server + lag1_gradient_backward + bet_odds, data = cov)
+
+prep_table <- function(fit, name, multiplier){
+  fit %>%
+    tidy() %>%
+    clean_names() %>%
+    select(-statistic) %>%
+    filter(!str_detect(term, "tournament")) %>%
+    mutate(
+      `2.5%` = exp(estimate * multiplier - 1.96*std_error*multiplier),
+      odds_ratio = exp(estimate * multiplier),
+      `97.5%` = exp(estimate * multiplier + 1.96*std_error*multiplier),
+      across(where(is.numeric), ~round(.x, digits = 4))) %>%
+    slice(1:3) %>%
+    mutate(term = c("Intercept", "backward_momentum", "bet_odds")) %>%
+    select(-estimate, -std_error, -p_value) %>%
+    rename_with(~paste0(name, "_", .x), .cols = everything())
+}
+
+prep_log_table <- function(men_fit, women_fit, combined_fit, multiplier){
+  em_men <- men_fit %>%
+    prep_table("men", multiplier) %>%
+    select(-contains("term"))
+  
+  em_women <- women_fit %>%
+    prep_table("women", multiplier) %>%
+    select(-contains("term"))
+  
+  combined_fit %>%
+    prep_table("combined", multiplier) %>%
+    bind_cols(em_men) %>%
+    bind_cols(em_women) %>%
+    rename("term" = "combined_term") %>%
+    mutate(
+      term = str_replace_all(term, "_", " "),
+      term = str_to_title(term),
+      term = recode(term,
+                     "Bet Odds" = "Pre-Match Win Probability")) %>%
+    rename_with(str_to_title)
+}
+```
+
+The model produces the log odds estimates, which are difficult to interpret, so we transform the estimates into odds ratios (Hosmer, Lemeshow, & Sturdivant, 2013) in @tbl-exist-odds-ratios. We place the full log odds and the many structural interactions in the Appendix (see @tbl-full-log-odds). We find that a 1 unit increase in the momentum entering a given point increases a player's odds of winning the point by an estimated 16.71%. With 95% certainty, we are confident the effect of a 1 unit increase in the momentum entering a point increases the players' odds of winning point by between 14.90% and 18.54%. This effect differs greatly for men and women. A 1 unit increase in momentum increases a male's odds of winning a point by 20.68%, and a 1 unit increase in momentum increases a female's odds of winning a point by 10.89%. All three of these results are both statistically significant and meaningful, indicating that a relationship exists. A 1 percentage point increase in the pre-match betting odds' implied win probability increases the player's odds of winning any given point by 0.58%. This is relatively consistent for male and female players.
+
+```{r model}
+#| label: tbl-exist-odds-ratios
+#| tbl-cap: "Does Momentum Exist - Odds Ratios and Confidence Intervals"
+
+prep_log_table(exist_momentum_men, exist_momentum_women, exist_momentum_combined, 1) %>%
+  flextable() %>%
+  add_header_row(
+    values = c("", "Combined", "Men", "Women"),
+    colwidths = c(1, 3, 3, 3), top = TRUE) %>%
+  set_header_labels(values = c("Term", "2.5%", "Odds Ratio", "97.5%", "2.5%", "Odds Ratio", "97.5%", "2.5%", "Odds Ratio", "97.5%")) %>%
+  align(align = "center", part = "all")
+```
+
+Admittedly, a 1 unit increase in the momentum is a large increase; players enter 95% of points with a momentum between -.470 and .472 (see Methodology @fig-momentum-dist). Thus, a 1 unit increase in momentum is a comparison of these extremes. We posit that a half unit change in momentum is a much more reasonable shift in momentum. A half unit change in momentum represents a shift from a neutral situation (50th percentile) to a situation where one player has strong momentum (98.2 percentile). It also represents a shift from a slight momentum (15th percentile) in favor of one player to a slight momentum (85th percentile) in favor of his or her opponent.
+
+We transform the odds ratios into a more interpretable value of a half unit change in momentum (Hosmer, Lemeshow, & Sturdivant, 2013). We display these new odds-ratios in @tbl-exist-odds-ratios-5. A half unit increase in the momentum entering a given point increases a player's odds of winning the point by an estimated 8.03%. With 95% certainty, we are confident the effect of a half unit increase in the momentum entering a point increases the players' odds of winning the point by between 7.19% and 8.87%. We use the term **momentum effect** to describe a player's change in odds of winning the point with a change in momentum. The results show that men experience more of a momentum effect than women. A half unit increase in the momentum entering a point increases a male's odds of winning a point by 9.85%, while a half unit increase in momentum entering a point increases a female's odds by 5.31%.
+
+```{r}
+#| label: tbl-exist-odds-ratios-5
+#| tbl-cap: "Does Momentum Exist - Odds Ratios and Confidence Intervals"
+
+prep_log_table(exist_momentum_men, exist_momentum_women, exist_momentum_combined, .5) %>%
+  filter(Term == "Backward Momentum") %>%
+  pivot_longer(cols = ends_with("2.5%"), names_to = "Model", values_to = "2.5%") %>%
+  pivot_longer(cols = ends_with("odds_ratio"), names_to = "model2", values_to = "Odds Ratio") %>%
+  pivot_longer(cols = ends_with("97.5%"), names_to = "model3", values_to = "97.5%") %>%
+  slice(1, 14, 27) %>%
+  select(Model, `2.5%`, `Odds Ratio`, `97.5%`) %>%
+  mutate(Model = str_remove(Model, "_2.5%")) %>%
+  flextable() %>%
+  align(align = "center", part = "all")
+```
+
+## Evaluating the model
+
+Traditionally, logistic regression models are evaluated in their prediction accuracy. This is difficult for our model for two reasons. First, the odds of winning a point are highly influenced by the server of the point (see Data @fig-server-win-percentage). The server plays such a large role in the prediction process that our model predicts the server to win the point almost 98.6% of the time. Thus, the accuracy of our model (~61.5%) mostly reflects the overall likelihood of a server to win a point (~61.4%). Second, our intention is primarily to assess the impact of the backward momentum on the point winner. While this effect is significant and meaningful, it is drastically overshadowed by structural covariates like **server**.
+
+```{r include = FALSE}
+# accuracy
+full <- cov %>%
+  select(point_victor, tournament, sex, server, bet_odds, lag1_gradient_backward) %>%
+  augment(exist_momentum_men, .)
+
+# full %>% accuracy(truth = point_victor, estimate = .pred_class)
+# 
+# # server correlation with prediction
+# full %>%
+#   mutate(
+#     server = if_else(server == 1, 1, 0)) %>%
+#   summarise(
+#     server_prediction_correlation = sum(server == .pred_class)/n()
+# )
+```
+
+In @fig-exist-roc, we display the model's RoC Curve, another common tool for estimating the strength of a model. While the model predicts more accurately than a coin flip, it lacks powerful predictive capability, and the area under the curve is only .645. This is in part reflected in the lack of dominance on the point-level in a tennis match. Across all matches in our data set, the winning player wins 54.7% of points (see Appendix @fig-victor-win-percentage). This means that a model that predicting the eventual winner of the match to win each individual point will be incorrect more than 45% of the time! This makes predicting the winner of an individual tennis point incredibly difficult.
+
+```{r}
+#| label: fig-exist-roc
+#| fig-cap: "RoC Curve"
+full %>%
+  roc_curve(truth = point_victor, .pred_0) %>%
+  mutate(
+    index = row_number() - 1,
+    false_positive = 1 - specificity) %>%
+  filter(index %% 100 == 0) %>%
+  ggplot() +
+  geom_line(aes(y = sensitivity, x = false_positive)) +
+  geom_segment(aes(x = 0, y = 0, xend = 1, yend = 1), linetype = "dashed") +
+  labs(y = "Sensitivity", x = "1 - Specificity")
+
+# full %>% roc_auc(truth = point_victor, .pred_0)
+```
+
+In @fig-probability-estimates, we display the estimated odds of a player winning the next point as the backward momentum varies. In these curves, we hold the betting odds' implied win probability constant at 50%. All values are for the server. We display eight curves, each reflecting unique conditions both between men's and women's tennis and within each tournament. The intercept for men's curves is higher, because the serve impact is larger for men. Within all settings, an increase in the backward momentum is associated with an increase in the estimated win probability. This increase is essentially linear within the bounds of backward momentum's possible values. Outside the bounds of backward momentum, the curve will follow the sigmoid curve, a characteristic of the logistic model. This visualization points to the disparity in the effect of momentum on men and women. The men's curves are steeper than women's, demonstrating that male players are more impacted by swings in momentum than female players.
+
+The visualization also demonstrates that the value of serving changes drastically in different tournaments. For both men and women, Wimbledon provides the greatest serve impact, while the French Open provides the least. A male server's win probability in the Australian Open and US Open is almost identical, so only the US Open is shown. We explore the effect of backward momentum on win probability while varying betting odds and serving in women's matches at Wimbledon in the Appendix (see @fig-betting-odds-server-momentum).
+
+```{r, include = FALSE}
+# estimates
+e_co <- exist_momentum_men %>%
+  tidy() %>%
+  clean_names() %>%
+  select(-statistic, -std_error, -p_value)
+
+# Woman in US Open, serving, even betting odds
+#women-server-us open
+predicted_women <- tibble(
+  backward_gradient = seq(-1, 1, by = .01),
+  odds_wsu = exp(e_co$estimate[1] + e_co$estimate[4] + backward_gradient*(e_co$estimate[2] + e_co$estimate[5]) + 50*(e_co$estimate[3] + e_co$estimate[6]) + e_co$estimate[21]),
+  pred_wsu = odds_wsu/(1+odds_wsu),
+  odds_wsf = exp(e_co$estimate[1] + e_co$estimate[4] + backward_gradient*(e_co$estimate[2] + e_co$estimate[5]) + 50*(e_co$estimate[3] + e_co$estimate[6]) + e_co$estimate[20]),
+  pred_wsf = odds_wsf/(1+odds_wsf),
+  odds_wsa = exp(e_co$estimate[1] + e_co$estimate[4] + backward_gradient*(e_co$estimate[2] + e_co$estimate[5]) + 50*(e_co$estimate[3] + e_co$estimate[6]) + e_co$estimate[19]),
+  pred_wsa = odds_wsa/(1+odds_wsa),
+  odds_wsw = exp(e_co$estimate[1] + e_co$estimate[4] + backward_gradient*(e_co$estimate[2] + e_co$estimate[5]) + 50*(e_co$estimate[3] + e_co$estimate[6])),
+  pred_wsw = odds_wsw/(1+odds_wsw))
+
+predicted_men <- tibble(
+  backward_gradient = seq(-1, 1, by = .01),
+  odds_msu = exp(e_co$estimate[1] + backward_gradient*e_co$estimate[2] + 50*e_co$estimate[3] + e_co$estimate[17]),
+  pred_msu = odds_msu/(1+odds_msu),
+  odds_msf = exp(e_co$estimate[1] + backward_gradient*e_co$estimate[2] + 50*e_co$estimate[3] + e_co$estimate[16]),
+  pred_msf = odds_msf/(1+odds_msf),
+  odds_msa = exp(e_co$estimate[1] + backward_gradient*e_co$estimate[2] + 50*e_co$estimate[3] + e_co$estimate[15]),
+  pred_msa = odds_msa/(1+odds_msa),
+  odds_msw = exp(e_co$estimate[1] + backward_gradient*e_co$estimate[2] + 50*e_co$estimate[3]),
+  pred_msw = odds_msw/(1+odds_msw))
+```
+
+```{r}
+#| label: fig-probability-estimates
+#| fig-cap: "Estimated Win Probability for Server"
+predicted_men %>%
+  left_join(predicted_women, by = join_by(backward_gradient)) %>%
+  pivot_longer(cols = c(pred_msu, pred_msf, pred_msa, pred_msw, pred_wsu, pred_wsf, pred_wsa, pred_wsw), names_to = "type", values_to = "probability") %>%
+  select(backward_gradient, type, probability) %>%
+  mutate(
+    Sex = if_else(str_detect(type, "_w"), "Women", "Men"),
+    Tournament = case_when(
+      str_detect(type, "sa") ~ "Australian Open",
+      str_detect(type, "sw") ~ "Wimbledon",
+      str_detect(type, "su") ~ "US Open",
+      str_detect(type, "sf") ~ "French Open",
+      .default = NA)) %>%
+  ggplot() +
+  geom_line(aes(x = backward_gradient, y = probability, color = Tournament, linetype = Sex)) +
+  scale_color_manual(
+    values = c(`Australian Open` = "cadetblue3", `French Open` = "indianred3", `US Open` = "navyblue", `Wimbledon` = "forestgreen"),
+    breaks = c("Wimbledon", "US Open", "Australian Open", "French Open"),
+    # labels = c("Wimbledon", "US Open", "Australian Men", "French Men", "Wimbledon Women", "US Women", "Australian Women", "French Women"),
+    name = "") +
+  scale_linetype_manual(
+        values = c(Men = "solid", Women = "dashed"),
+        name = "") +
+  labs(x = "Backward Momentum", y = "Point Win Probability", title = "Win Probability by Momentum") +
+  scale_y_continuous(labels = scales::percent)
+```
+
+## Verification
+
+One of the primary concerns of this model is that the asymmetry in player skill will disrupt results. We control for player skill with the pre-match betting odds of the match, but it is possible that player skill at the time of the match is a stochastic process that randomly deviates from the true player skill. The pre-match betting odds are simply a point estimate of the player's skill entering a match. If so, then the difference between the player's skill during the match and the estimated skill would be left unaccounted for by our controls. If this difference is large enough, it could correlate with both backward momentum and point victor for the duration of the match. This unknown confounding variable could give momentum the appearance of explaining the point victor even if there is no causal relationship.
+
+If this concern is true and momentum does not exist, then the backward momentum is purely a function of the player's skill in the match and is unrelated with the time that points occur. The backward momentum entering point *t* should have the same relationship with the result of point *t* as point *t+50*. That is, the proximity of backward momentum and the point result should have no impact on the estimate.
+
+To assess the validity of this concern, we estimate the coefficients of backward_momentum regressed on the point victor. We compare the relationship between backward momentum and point *t* with backward momentum and point *t+1*, etc. We display the results of all three models (men, women, and combined) in @fig-future-backward-momentum. We see that as the time-distance between the point and backward momentum increases, the size of the relationship tends to decrease significantly for all three models. Backward momentum at point *t* is highly correlated with backward momentum at point *t+1*, so it is unsurprising that the estimates take some time to diminish in size. Moreover, we posit that momentum tends to be a slow-reacting force, so we would expect the momentum effect to linger or even compound for many points. However, it is clear that backward momentum is a much stronger predictor for the outcome of near points than far points for all three models. This demonstrates that the unknown confounder *player skill*, which remains constant throughout the entire match for both players (we suggest that traits of the player that vary throughout the match are encompassed in our definition of momentum) is not the primary actor on backward momentum. If so, the effect of backward momentum at point *t* on the outcome future points would remain constant for the entirety of the match.
+
+```{r}
+# creating robust data
+# {
+# combine_robust <- function(fit, i){
+#   fit %>%
+#     tidy() %>%
+#     select(estimate, std.error) %>%
+#     slice(2) %>%
+#     mutate(covariate = str_c("backward_",i))
+# }
+# 
+# robust <- function(n){
+#   robust_check <- tibble()
+#   
+#   robust_check <- lr_mod %>%
+#     fit(point_victor ~ tournament:sex:server + lag1_gradient_backward + bet_odds, data = cov) %>%
+#     combine_robust(1) %>%
+#     bind_rows(robust_check)
+#   
+#   robust_check <- lr_mod %>%
+#     fit(point_victor ~ tournament:sex:server + lag2_gradient_backward + bet_odds, data = cov) %>%
+#     combine_robust(2) %>%
+#     bind_rows(robust_check)
+#   
+#   robust_check <- lr_mod %>%
+#     fit(point_victor ~ tournament:sex:server + lag3_gradient_backward + bet_odds, data = cov) %>%
+#     combine_robust(3) %>%
+#     bind_rows(robust_check)
+#   
+#   robust_check <- lr_mod %>%
+#     fit(point_victor ~ tournament:sex:server + lag4_gradient_backward + bet_odds, data = cov) %>%
+#     combine_robust(4) %>%
+#     bind_rows(robust_check)
+#   
+#   for(i in 5:n){
+#     robust_check <- lr_mod %>%
+#       fit(point_victor ~ tournament:sex:server + gb + bet_odds, data = cov %>% group_by(match_id) %>% mutate(gb = lag(lag4_gradient_backward, (i-4))) %>% ungroup()) %>%
+#       combine_robust(i) %>%
+#       bind_rows(robust_check)
+#   }
+#   robust_check
+# }
+# 
+# robust_sex <- function(df, n){
+#   robust_check <- tibble()
+#   
+#   robust_check <- lr_mod %>%
+#     fit(point_victor ~ tournament:sex:server + lag1_gradient_backward:sex + bet_odds:sex, data = df) %>%
+#     combine_robust(1) %>%
+#     bind_rows(robust_check)
+#   
+#   robust_check <- lr_mod %>%
+#     fit(point_victor ~ tournament:sex:server + lag2_gradient_backward:sex + bet_odds:sex, data = df) %>%
+#     combine_robust(2) %>%
+#     bind_rows(robust_check)
+#   
+#   robust_check <- lr_mod %>%
+#     fit(point_victor ~ tournament:sex:server + lag3_gradient_backward:sex + bet_odds:sex, data = df) %>%
+#     combine_robust(3) %>%
+#     bind_rows(robust_check)
+#   
+#   robust_check <- lr_mod %>%
+#     fit(point_victor ~ tournament:sex:server + lag4_gradient_backward:sex + bet_odds:sex, data = df) %>%
+#     combine_robust(4) %>%
+#     bind_rows(robust_check)
+#   
+#   for(i in 5:n){
+#     robust_check <- lr_mod %>%
+#       fit(point_victor ~ tournament:sex:server + gb:sex + bet_odds:sex, data = df %>% group_by(match_id) %>% mutate(gb = lag(lag4_gradient_backward, (i-4))) %>% ungroup()) %>%
+#       combine_robust(i) %>%
+#       bind_rows(robust_check)
+#   }
+#   robust_check
+# }
+# 
+# robust100_women <- robust_sex(cov2, 100)
+# 
+# robust100_men <- robust_sex(cov, 100)
+# 
+# robust100 <- robust(100)
+# 
+# altogether <- robust100_men %>% mutate(type = "men") %>%
+#   bind_rows(robust100_women %>% mutate(type = "women")) %>%
+#   bind_rows(robust100 %>% mutate(type = "combined")) %>%
+#   mutate(
+#     covariate = as.double(str_remove(covariate, "backward_")))
+# 
+# # write_csv(altogether, here("mom_exist_robust.csv"))
+# }
+```
+
+```{r}
+#| label: fig-future-backward-momentum
+#| fig-cap: "Backward Momentum on Future Points"
+
+robust <- read_csv(here("mom_exist_robust.csv"))
+
+robust %>%
+  mutate(
+    type = str_to_title(type),
+    type = factor(type, levels = c("Men", "Combined", "Women")),
+    lower_limit = estimate - std.error*1.96,
+    upper_limit = estimate + std.error*1.96) %>%
+  ggplot(aes(x = covariate, y = estimate)) +
+  # geom_point(aes(color = type), size = .25) +
+  geom_smooth(aes(color = type), span = .4, se = FALSE, method = "loess") +
+  geom_pointrange(aes(ymin = lower_limit, ymax = upper_limit, color = type), size = .025, alpha = .5) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Point", y = "Log Odds", title = "Backward Momentum on Future Points") +
+  scale_x_continuous(limits = c(0, 80)) +
+  scale_y_continuous(breaks = c(-.05, 0,.05, .1, .15, .2), limits = c(-.06, .225)) +
+  scale_color_discrete(name = "")
+```
+
+Altogether, we see that the effects of backward momentum at point *t* diminish over time. We can conclude for all three models that the effect of backward momentum is not meaningfully confounded by the player skill at the time of the match. Our interpretations, therefore, are not meaningfully disrupted.
+
+## Second Approach
+
+For robustness, we take a second approach to verify that backward momentum impacts future results. Previously, we demonstrate that backward momentum tends to increase odds of winning the next point. Now, we are interested in backward momentum's impact on the future trend of the match. That is, what effect does backward momentum have on future momentum? The outcome variable **future_momentum** measures the future trend of a match immediately after a point on a continuous scale from -1 to 1 (see Methodology), and the covariate **backward_momentum** measures a player's performance up to a given point. Thus, we argue that if a players' momentum does not exist, then while controlling for structural variables, backward momentum should have no correlation with future momentum. If matches follow a random walk, then past performance should have no association with future performance.
+
+In this model, we use multi-linear regression to assess the effect of backward momentum on future momentum. We control for the server, tournament, and sex of the players. We also control for the pre-match betting odds in each match. We interact the sex of the players with backward momentum, so we can evaluate men and women's different relationships with momentum. In the model, we assume that the relationship between the covariates and the future momentum is linear. We assume that the residuals are normally distributed and homoscedastic, and we assume that the covariates are uncorrelated. We find that all four of these assumptions hold. The supporting figures are located in the Appendix (see @fig-approach-assumptions).
+
+We display the results of the model in @tbl-second-approach. As in the logistic model, we transform the backward momentum values, so that the estimates display the effect of a half-unit change in backward momentum. We find this half-unit change to be a more reasonable change in momentum. A half-unit increase in backward momentum amounts to a .0169 unit increase in future momentum. Again, we find stronger evidence for a momentum effect in men than women. For men, the half-unit increase is associated with a .0224 unit increase in future momentum, while women see a .0081 unit increase in future momentum. The pre-match win probability estimate is consistent throughout the models at about .0025. We place the estimates for the structural variables in the Appendix (see @tbl-second-full-results).
+
+```{r}
+#| label: tbl-second-approach
+#| tbl-cap: "Backward and Future Momentum Relationship"
+
+lm_spec <- linear_reg() %>%
+  set_mode("regression") %>%
+  set_engine("lm")
+
+momentum_relationship <- lm_spec %>%
+  fit(gradient_forward ~ server:sex:tournament + bet_odds + gradient_backward, data = cov %>% mutate(gradient_backward = gradient_backward*2))
+
+cov_men <- cov %>% filter(sex == "men")
+
+momentum_relationship_men <- lm_spec %>%
+  fit(gradient_forward ~ server:tournament + bet_odds + gradient_backward, data = cov_men %>% mutate(gradient_backward = gradient_backward*2))
+
+cov_women <- cov %>% filter(sex == "women")
+
+momentum_relationship_women <- lm_spec %>%
+  fit(gradient_forward ~ server:tournament + bet_odds + gradient_backward, data = cov_women %>% mutate(gradient_backward = gradient_backward*2))
+
+percentile_effect <- function(vector){
+  result <- vector()
+  for(i in 1:length(vector)){
+    value <- mean(vector[i] > gs$gradient_forward, na.rm = TRUE) - mean(0 > gs$gradient_forward, na.rm = TRUE)
+    result <- c(result, value)
+  }
+  result
+}
+
+prep_linear_table <- function(model_fit, name){
+  model_fit %>% 
+    pluck("fit") %>%
+    tidy() %>%
+    clean_names() %>%
+    select(-statistic) %>%
+    mutate(
+      # `Percent Change` = percentile_effect(estimate),
+      across(where(is.numeric), ~round(.x, digits = 4)),
+      symbol = case_when(
+        p_value < .001 ~ "***",
+        p_value < .01 ~ "**",
+        p_value < .05 ~ "*",
+        .default = ""),
+      estimate = str_c(as.character(format(estimate, scientific = FALSE)), symbol),
+      std_error = str_c("(", format(std_error, scientific = FALSE), ")")) %>%
+    pivot_longer(cols = c(estimate, std_error), names_to = "metric", values_to = name) %>%
+    select(-symbol, -p_value) %>%
+    # relocate(`Percent Change`, .after = last_col()) %>%
+    filter(!str_detect(term, "2"), !str_detect(term, "sex"), !str_detect(term, "server"), !str_detect(term, "Intercept"), !str_detect(term, "victor0"))
+}
+
+momentum_relationship %>%
+  prep_linear_table("full") %>%
+  left_join(momentum_relationship_men %>% prep_linear_table("men"), by = join_by(term, metric)) %>%
+  left_join(momentum_relationship_women %>% prep_linear_table("women"), by = join_by(term, metric)) %>%
+      mutate(
+        term = dplyr::recode(term,
+                     "bet_odds" = "Pre-Match Win Probability",
+                     "gradient_backward" = "Backward Momentum")) %>%
+  select(-metric) %>%
+  rename_with(str_to_title) %>%
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  merge_v(j = ~Term) %>%
+  set_header_labels(values = c("Term", "Combined", "Men", "Women")) %>%
+  width(j = 1, width = 1.2)
+```
+
+# What Factors Impact Momentum?
+
+Having found evidence for the existence of momentum, we progress to identifying the influences of momentum. We are interested in identifying the characteristics of a point that tend to increase or decrease the trajectory of the match from that point. We ask, do certain types of points or results typically increase or decrease momentum? We use a linear regression model to evaluate the effect of various match characteristics at a given point on the future momentum.
+
+We posit that certain covariates have a short-term effect on a match's momentum, while the effect of other covariates is more long-lasting. For instance, the **point_victor** covariate may have a strong impact on the future momentum of the next point, but it's effect likely wanes after a few more points cloud the memory of the player. The **set_victor** covariate, however, is likely to still have a sizable impact on the match's momentum for a long period of time. For this reason, we divide our covariates into two similar models. The first model is on the point-level, and the second model is on the game-level.
+
+One advantage of our data set is the quantity of observations. This allows us to evaluate the impact of rare interacting scenarios. However, this artificially diminishes the p-values of some of our estimators. Often, this leads to some covariates holding small p-values despite possessing a weak effect on the outcome variable. Known as the Large Samples and p-value problem, this is an increasingly prominent hurdle for researchers (Lin, Lucas, & Shmueli, 2013; Gomez-de-Mariscal et al., 2021).
+
+To combat these potential problems, we reduce the size of our data set in a secondary model that only contains matches where players have close pre-match win probabilities. We specifically include all matches where the pre-match win probability for each player is at least 40%. This accomplishes two objectives. First, it reduces our data set dramatically (1.36 million to 250,000 observations). This will make the p-values more representative. Second, it eliminates matches that have a large skill discrepancy among the players. These matches are more likely to be one-sided, with one player holding the momentum for nearly the entire match. This (as well as the betting odds control), further reduces the potential for the unknown confounding variable *player skill* to disrupt the results. We display the coefficients of both the full and reduced models together in @tbl-point-level. In our analysis of the results, we intentionally emphasize the effect size of the coefficients instead of their significance (Lin, Lucas, & Shmueli, 2013).
+
+## Point Level Model
+
+The point-level model uses a multi-linear regression model (Kuhn & Johnson, 2013; Kuhn et al., 2020) to estimate the effect of several short-term covariates on the future momentum after each point. We assess the effect of winning a point, winning a long point, converting or saving a break point, and hitting a winner, ace, double fault, or unforced error on the future momentum. We control for the server, pre-match betting odds, and the sex and tournament of the match. We choose to interact each of these covariates with the sex of of the players, because we are interested in learning how various relationships differ between the sexes.
+
+Many of these covariates exist for both player 1 and player 2. For example, both player 1 and player 2 can hit an ace. However, the assignment of player 1 and player 2 is random, so the estimates of the covariates should be relatively equal (with some random noise) and opposite. For ease, we display only player 1's covariates. The conclusions we draw are the same for player 2, and these results are located in the Appendix (see @tbl-point-full-results).
+
+In this model and its' interpretations, we make several assumptions. We assume that the relationship between the covariates and the future momentum is linear. We assume that the residuals are normally distributed and homoscedastic. We find that all three of these assumptions hold. The supporting figures are located in the Appendix (see @fig-point-assumptions).
+
+We also assume that the covariates themselves are uncorrelated. By choice, some of the covariates of the model are correlated. For example, hitting a winner or ace is correlated with winning a point, because every time a player hits a winner or ace, they win the point. Moreover, we introduce multicollinearity intentionally with interaction terms. However, the only large correlation between covariates is between **winner**, **ace**, and the **point_victor** (see @tbl-point-correlation-matrix). We do not anticipate that these correlations adversely impact the estimates. Outside of **winner**, the Variance Inflation Factor (VIF) for each covariate is less than 2, and the estimates do not appear to be unstable. The extensive tables are located in the Appendix (see @tbl-point-multicollinearity).
+
+```{r include = FALSE}
+# interesting and all good on the point level
+cov_model <- lm_spec %>%
+  fit(gradient_forward ~ server:sex:tournament + bet_odds + point_victor + 
+        point_victor:long_point + break_converted + break_saved +
+        p1_winner + p2_winner + p1_ace + p2_ace + p1_double_fault + p2_double_fault +
+        p1_unf_err + p2_unf_err, data = cov)
+
+cov_model_men <- lm_spec %>%
+  fit(gradient_forward ~ server:tournament + bet_odds + point_victor + 
+        point_victor:long_point + break_converted + break_saved +
+        p1_winner + p2_winner + p1_ace + p2_ace + p1_double_fault + p2_double_fault +
+        p1_unf_err + p2_unf_err, data = cov_men)
+
+cov_model_women <- lm_spec %>%
+  fit(gradient_forward ~ server:tournament + bet_odds + point_victor + 
+        point_victor:long_point + break_converted + break_saved +
+        p1_winner + p2_winner + p1_ace + p2_ace + p1_double_fault + p2_double_fault +
+        p1_unf_err + p2_unf_err, data = cov_women)
+
+cov_close <- cov %>% filter(between(bet_odds, 40, 60))
+
+cov_model_close <- lm_spec %>%
+  fit(gradient_forward ~ server:sex:tournament + bet_odds + point_victor + 
+        point_victor:long_point + break_converted + break_saved +
+        p1_winner + p2_winner + p1_ace + p2_ace + p1_double_fault + p2_double_fault +
+        p1_unf_err + p2_unf_err, data = cov_close)
+
+cov_close_men <- cov_men %>% filter(between(bet_odds, 40, 60))
+
+cov_model_close_men <- lm_spec %>%
+  fit(gradient_forward ~ server:tournament + bet_odds + point_victor + 
+        point_victor:long_point + break_converted + break_saved +
+        p1_winner + p2_winner + p1_ace + p2_ace + p1_double_fault + p2_double_fault +
+        p1_unf_err + p2_unf_err, data = cov_close_men)
+
+cov_close_women <- cov_women %>% filter(between(bet_odds, 40, 60))
+
+cov_model_close_women <- lm_spec %>%
+  fit(gradient_forward ~ server:tournament + bet_odds + point_victor + 
+        point_victor:long_point + break_converted + break_saved +
+        p1_winner + p2_winner + p1_ace + p2_ace + p1_double_fault + p2_double_fault +
+        p1_unf_err + p2_unf_err, data = cov_close_women)
+```
+
+In @tbl-point-level, we add the Percent Change column to demonstrate the effect size of the estimates. The Percent Change column reflects the percentile change (from the mean) in future momentum with a 1 unit change in the covariate. Thus, a 2% percentile change reflects a shift from the 50th to 52nd percentile with a 1 unit change in the covariate. The standard errors of the estimates are in parenthesis, and the significance level is noted with asterisks on the estimates.
+
+We find that converting a break tends to bring a large increase in future momentum. Players converting a break point tend to see a .0156 unit increase in their future momentum. This is particularly significant, given that a .0156 increase has an overall 2.6% percentile increase in future momentum. Converting a break point is significant among both male and female players (~.016). Interestingly, this effect increases for men in the reduced model (.0195) but decreases for women in the reduced model (.0118).
+
+We also find strong evidence that saving a break point tends to decrease (-.0068) future momentum. This can be reinterpreted to demonstrate that a player close to breaking serve still tends to find a significant increase in future momentum. However, this increase is much smaller than the increase had the player converted the break point. As with before, the effect size is much larger for male players (.0094) than female players (.0032).
+
+We find that winning a point tends to increase future momentum for male players. In both the full and reduced model, the point victor yields a strong association (.0034) with an increase in future momentum. This association increases for men (.0049), but decreases significantly for women (.0009). This casts some doubt on the association between winning a point and future momentum for women.
+
+There is evidence that hitting an ace tends to increase future momentum (.0068). The effect size remains positive for both men (.0078) and women (.0042). The female and male estimates increase and decrease, respectively, in the reduced model, but it is possible that this change is due to the correlation between the **ace** and **winner** covariates explained below.
+
+There is mild evidence that striking a winner impacts future momentum. The full model has a very weak estimate (.0002), but there is a much stronger association (.0033) in the reduced model. The winner estimate for men is negative and insignificant in the full model, but strong and positive in the reduced model. The winner coefficient for women is positive but mediocre within both models. All aces are winners, and we posit that the strong effect of an ace on momentum clouds the effect of a winner.
+
+The model fails to find a large effect for double faults, unforced errors, winning long points, and recovering to hold. Generally, the estimates of all four covariates hold the sign that we would expect in both the combined full and combined reduced model, but their effect sizes are small. Double faults tend to have a slight, insignificant negative effect on future momentum (-.0011). Unforced errors tend to have a slight negative effect (-.0004), but there are some surprising and irregular results in the smaller models. There is minimal evidence that long points diminish the overall effect of winning points (-.002). This effect size is greater for men (-.0028) and within the reduced model (-.0035). However, the sign of the estimate flips for player 2 (see Appendix @tbl-point-full-results). This suggests that the result may be too weak to draw conclusions.
+
+In total, we find that converting a break point and striking an ace tend to increase future momentum, while saving a break point correlates with a decrease in future momentum. We have strong evidence that hitting a winner increases future momentum for men, and we have mild evidence that striking winners leads to an increase in future momentum. In general, we find a greater effect size for men than women.
+
+```{r}
+#| label: tbl-point-level
+#| tbl-cap: "What Impacts Momentum: Point Level"
+
+prep_linear_tables <- function(comb_full, comb_reduced, men_full, men_reduced, women_full, women_reduced){
+  c1 <- prep_linear_table(comb_reduced, "Combined Reduced")
+  c2 <- prep_linear_table(comb_full, "Combined Full") %>%
+    left_join(c1, by = join_by(term, metric))
+  m1 <- prep_linear_table(men_reduced, "Men Reduced")
+  m2 <- prep_linear_table(men_full, "Men Full") %>%
+    left_join(m1, by = join_by(term, metric))
+  w1 <- prep_linear_table(women_reduced, "Women Reduced")
+  w2 <- prep_linear_table(women_full, "Women Full") %>%
+    left_join(w1, by = join_by(term, metric))
+
+  left_join(c2, m2, by = join_by(term, metric)) %>%
+    left_join(w2, by = join_by(term, metric)) %>%
+    mutate(
+      term = str_remove(term, "p1_"),
+      term = str_remove_all(term, "1"),
+      term = str_replace_all(term, "_", " "),
+      term = str_replace_all(term, ":", " & "),
+      term = str_to_title(term),
+      term = dplyr::recode(term,
+                     "Bet Odds" = "Pre-Match Win Probability",
+                    "Unf Err" = "Unforced Error")) %>%
+    select(-metric) %>%
+    rename_with(str_to_title)
+}
+
+prep_linear_tables(cov_model, cov_model_close, cov_model_men, cov_model_close_men, cov_model_women, cov_model_close_women) %>%
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  merge_v(j = ~Term) %>%
+  add_header_row(
+    values = c("", "Combined", "Men", "Women"),
+    colwidths = c(1, 4, 4, 4), top = TRUE) %>%
+  set_header_labels(values = c("Term", "Full", "Percent Change", "Reduced", "Percent Change", "Full", "Percent Change", "Reduced", "Percent Change", "Full", "Percent Change", "Reduced", "Percent Change")) %>%
+  merge_v(j = c(3,5,7,9,11,13)) %>%
+  width(j = 1, width = 1.3)
+```
+
+## Game Level Model
+
+The game-level model utilizes a second multi-linear regression model to estimate the effect of the long-term covariates on the future momentum after the conclusion of each game. We assess the effect of changing sides of the court, an interruption in play, and winning a game, set, or tiebreak on the future momentum. Again, we interact the sex of the players with each of these covariates to assess the nuanced effect that a player's sex has on momentum. We control for the server, pre-match betting odds, and the sex and tournament of the match.
+
+As with the point level model, the values for player 1 and 2 are similar, so we display the covariates only from player 1's perspective. As in the point level model, we assume that the relationship between the long-term covariates and the future momentum is linear. We assume that the residuals are normally distributed and homoscedastic. We find that all three of these assumptions hold. The supporting figures are located in the Appendix (see @fig-game-assumptions).
+
+Once again, our assumption that the covariates are uncorrelated is challenged. If **set_victor** holds a value of 1, then so will **game_victor**. Similarly, **tiebreak_victor** and **set_victor** have nested relationships. In addition, we intentionally introduce correlation by using interaction terms (such as interacting **interruption** with **game_victor**). The largest correlations are between **interruption** and **change_ends**, and between **game_victor** and **server** (see @tbl-game-correlation-matrix). The relationship between **interruption** and **change_ends** is concerning, as removing one covariate does meaningfully impact the other covariate's estimate. In general, we are less certain about conclusions related with these covariates. However, as a whole, the VIF of each covariate is less than 5, and we do not anticipate that these correlations adversely impact the estimates. The supporting figures and tables are located in the Appendix (see @fig-game-correlation-matrix and @tbl-game-multicollinearity).
+
+```{r}
+game_cov <- cov %>%
+  group_by(match_id) %>%
+  mutate(
+    interruption = factor(lead(interruption)),
+    change_ends = factor(lead(change_ends))) %>%
+  filter(last_pt_game == 1) %>%
+  mutate(
+    set_victor = case_when(
+      last_pt_set == "1" & game_victor == "1" ~ 1,
+      last_pt_set == "1" & game_victor == "2" ~ 2,
+      .default = 0) %>% factor(),
+    lead1_gradient_forward = lead(gradient_forward),
+    game_victor = factor(if_else(game_victor == 2, 0, 1)),
+    tiebreak_victor = tiebreak_victory) %>%
+  select(-tiebreak_victory) %>%
+  ungroup()
+
+game_cov_model <- lm_spec %>%
+  fit(gradient_forward ~ game_victor:server + server:sex:tournament + game_victor + bet_odds + interruption:game_victor + change_ends:game_victor + 
+        tiebreak_victor + set_victor, data = game_cov)
+
+game_cov_men <- game_cov %>% filter(sex == "men")
+
+game_cov_model_men <- lm_spec %>%
+  fit(gradient_forward ~ game_victor:server + server:tournament + game_victor + bet_odds + interruption:game_victor + change_ends:game_victor + 
+        tiebreak_victor + set_victor, data = game_cov_men)
+
+game_cov_women <- game_cov %>% filter(sex == "women")
+
+game_cov_model_women <- lm_spec %>%
+  fit(gradient_forward ~ game_victor:server + server:tournament + game_victor + bet_odds + interruption:game_victor + change_ends:game_victor + 
+        tiebreak_victor + set_victor, data = game_cov_women)
+
+game_cov_close <- game_cov %>%
+  filter(between(bet_odds, 40, 60))
+
+game_cov_model_close <- lm_spec %>%
+  fit(gradient_forward ~ game_victor:server + server:sex:tournament + game_victor + bet_odds + interruption:game_victor + change_ends:game_victor  + 
+        tiebreak_victor + set_victor, data = game_cov_close)
+
+game_cov_close_men <- game_cov_close %>% filter(sex == "men")
+
+game_cov_model_close_men <- lm_spec %>%
+  fit(gradient_forward ~ game_victor:server + server:tournament + game_victor + bet_odds + interruption:game_victor + change_ends:game_victor  + 
+        tiebreak_victor + set_victor, data = game_cov_close_men)
+
+game_cov_close_women <- game_cov_close %>% filter(sex == "women")
+
+game_cov_model_close_women <- lm_spec %>%
+  fit(gradient_forward ~ game_victor:server + server:tournament + game_victor + bet_odds + interruption:game_victor + change_ends:game_victor +
+        tiebreak_victor + set_victor, data = game_cov_close_women)
+```
+
+In @tbl-game-level, we find that winning a game tends to increase future momentum (.0238). The effect size is considerable; a 4 percentile increase in future momentum. The effect is positive and significant for both men (.0259) and women (.204). Winning a set, however, tends to increase future momentum by an even larger amount (.032). Interestingly, this effect size is larger for women (.0386) than men (.0287). In the full combined model, future momentum decreases (-.0187) with a tiebreak victory (conditional on winning a set). However, in the reduced combined model, the future momentum increases (.0099) with a tiebreak victory (conditional on winning a set). These results are similar and exacerbated among men, but no difference exists among women.
+
+We find that an interruption in play tends to decrease (-.0051) the future momentum of the player winning the previous game. This is significant ($/alpha = .05$) in the full model, but insignificant in the reduced model. However, the effect size increases in the reduced model (-.009), suggesting that this decline in future momentum is legitimate. The effect size remains stable and negative among both men (-.005) and women (-.0052). Interruptions in play are highly correlated with changing ends of the court, so we verify the interruption estimates by removing the **change_ends** covariate. If **change_ends** is removed from the model, the coefficient for **interruption** still shows a negative association with future momentum (-.0054). The effect size is similar for both men (-.0062) and women (-.004). In contrast, we find little evidence that a change of ends impacts future momentum with and without interruptions included in the model.
+
+```{r}
+#| label: tbl-game-level
+#| tbl-cap: "What Impacts Momentum: Game Level"
+prep_linear_tables(game_cov_model, game_cov_model_close, game_cov_model_men, game_cov_model_close_men, game_cov_model_women, game_cov_model_close_women) %>% 
+  flextable() %>%
+  align(align = "center", part = "all") %>%
+  add_header_row(
+    values = c("", "Combined", "Men", "Women"),
+    colwidths = c(1, 2, 2, 2), top = TRUE) %>%
+  set_header_labels(values = c("Term", "Full", "Percent Change", "Reduced", "Percent Change", "Full", "Percent Change", "Reduced", "Percent Change", "Full", "Percent Change", "Reduced", "Percent Change")) %>%
+  merge_v(j = c(1,3,5,7,9,11,13))
+```
+
+
+
+
+
+
+
+

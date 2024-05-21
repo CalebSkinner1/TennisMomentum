@@ -1,0 +1,104 @@
+---
+title: "Conclusion"
+author: Caleb Skinner
+format: pdf
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  comment = "#", fig.height = 3, 
+  cache = FALSE,  collapse = TRUE,
+  error = TRUE, echo = FALSE,
+  message = FALSE)
+```
+
+```{r libraries, include = FALSE}
+library("arrow")
+library("here")
+library("flextable")
+library("tidyverse"); theme_set(theme_minimal())
+library("tidymodels")
+```
+
+```{r, include = FALSE}
+set_flextable_defaults(
+  font.size = 10, theme_fun = theme_apa,
+  padding = 6,
+  background.color = "#EFEFEF",
+  text.align = "center")
+```
+
+```{r data, include = FALSE}
+cov2 <- read_parquet(here("covariates.parquet"))
+gs <- read_parquet(here("grandslams2.parquet"))
+```
+
+# Discussion
+
+## Does Momentum Exist?
+
+While controlling for structural components, players' skill, and the server, we find that a half-unit increase in backward momentum tends to increase a player's odds of winning a point by 8%. These results lead to two immediate conclusions. First, an 8% increase in the odds of winning a point is meaningful in professional tennis. Even the best players tend to win only 53-54% of the points in their career. If a player begins with a 50% chance to win a point, an 8% increase in odds corresponds to a win probability of 53.7%. Over a 100-200 point match, this difference will be significant. Second, the effect of momentum on winning is less than many would expect. A player can dominate for a long stretch and gain only a mild boost in individual point win probability. Many unknown and uncontrollable factors impact the result of point, and perhaps onlookers tend to attribute too much weight on past points.
+
+These findings contribute more evidence to the conclusion that previous points do impact the results of future points (Klaasen & Magnus, 2001; Gauriot & Page, 2019), but they affirm the notion that the momentum effect plays a small part in the outcome of an individual tennis point. This rejects the claims of Gilovich, Vallone, & Tversky (1985); Albright (1989); etc. that past results do not impact future results, while giving credence to their arguments. We find that the momentum effect does exist and that past results are correlated with future results, but the effect sizes are small and drastically overestimated in popular culture.
+
+Interestingly, these results differ greatly among male and female players. Men can expect an increase in odds of point victory of 9.9%, while women experience an increase of only 5.3%. This disparity contributes to the hypothesis that male tennis players are more prone to the momentum effect than female players (Depken, Gandar, & Shapiro, 2022; Page & Coates, 2017; Gauriot & Page, 2019), lending support to the biological framework of momentum. This theory proposes that winning produces positive chemicals that increase the likelihood of further success (Robertson, 2012). Men tend to have more of these chemicals, so they should experience a larger "winner effect" (Bezuglov et al., 2023).
+
+## What Factors Impact Momentum?
+
+In our second study, we assess the effect of several features on the future trajectory of the match, a concept we term future momentum. While controlling for structural components and player skill, we find strong and meaningful evidence that converting a break point and striking an ace tend to increase future momentum, while saving a break point tends to decrease future momentum on the point level. We find evidence that winning points is positively associated with future momentum for male players. On the game level, our results show that winning a game and a set tend to increase future momentum, while an interruption in play decreases future momentum for the winning player. In general, we find a stronger effect size for men than women.
+
+We can conclude that winning tends to lead to more winning. Winning a point, game, and set all are associated with an increase in future momentum, regardless of the conditions. These results support the notion of the winner effect (Robertson, 2012), and add to the evidence that winning points (Klaasen & Magnus, 2001; Gauriot & Page, 2019), games (Meier et al., 2020), and sets (Page & Coates, 2017) leads to future success in professional tennis.
+
+This winner effect, however, is not consistent across each situation. Notably, our results demonstrate that the impact of winning increases as the significance of victory increases. Winning a point (.0035), game (.0238), and set (.0309) all tend to increase future momentum on the point or game level. This suggests that as players progress closer to their goal of winning a match, they tend to play better. This result is demonstrated most clearly in comparing the effect of winning a set among men and women. For both men and women, winning a set is a vital achievement in the course of a match. To win a match, men need to win three sets, while women only need to win two. Correspondingly, the effect of winning a set on the future momentum is much higher for women (.0375) than men (.0276). This difference is further accentuated, because most covariates tend to have a stronger effect for men than women. We propose that winning a set tends to increase future momentum more for women than men, because it carries more strategic significance. That is, winning a set brings female players closer to their end goal of winning a match than male players. These results support the economic theory of strategic momentum (Mago, Sheremeta, & Yates 2012; Depken, Gandar, & Shapiro, 2022).
+
+Next, we consider the effect of winning a tiebreak. We find that, conditional on winning a set, tiebreaks have a strong negative association in the full model. This makes intuitive sense. Tiebreaks are an indicator of a close match, so the future momentum associated with winning a set should be lessened. However, in men's matches with close pre-match betting odds, the effect of winning a tiebreak is actually *positive*, conditional on winning a set. We suggest that these male players are anticipating a close match, so they receive a psychological boost if they win a tiebreak. These results fit surprisingly well with the findings of Page & Coates (2017). Their analysis detects a winner effect among male players in close matches. Their research, like ours, finds no such effect for female players.
+
+Our results strengthen the conclusion that converting a break point is associated with an increase in future success (Meier et al., 2020). This is arguably our strongest and most meaningful result. Interestingly, we find that players who nearly convert a break point still tend to experience an increase (albeit much smaller) in future success. Perhaps these players experience a psychological boost from nearly achieving their goal? Or perhaps these near disastrous situations wear on their opponent? Regardless, these findings tend to conflict with the philosophy of the economic framework, which suggests that momentum arises from a favorable changes in a game's structure or score.
+
+In addition, we can conclude that interruptions in play tend to slightly diminish the winner effect for both male and female players. While the effect size is small, we find consistent evidence that an interruption in play decreases the future momentum of the player winning the most recent game. The winning player still tends to experience an increase in future momentum, but the increase is smaller than if no interruption had occurred. These results affirm the findings of Meier et al. (2020), who conclude that the momentum is primarily a psychological effect. Interruptions in play permit losing players to recover and winning players to lose confidence. 
+
+Moreover, these findings support the psychological concept that certain prominent events can serve as catalysts of momentum (Adler & Adler, 1978). We find strong evidence that striking an ace tends to meaningfully increase future momentum above and beyond that of winning a point. We also find mixed evidence that striking winners increases future momentum. These conclusions are intuitive. They suggest that, regardless of the situation, winning in memorable or dominating ways can have an outsized effect on the future trend of a match.
+
+Our findings indicate that the overall source of momentum is a mixture of the biological, psychological, and strategic frameworks. Male players are more susceptible to momentum than female players. Interruptions diminish momentum, and aces augment it. Female players tend to experience a stronger benefit from winning a set than male players. We suggest that all three frameworks interact to form momentum.
+
+# Model Improvement
+
+While our models give satisfactory results, we suggest several improvements that may reduce error and strengthen our assumptions.
+
+The pre-match betting odds are an essential structural control for our model. It's accuracy and performance reduces the confounding effect of *player skill* and preserves the true relationship between momentum and results. In this paper, we compare the betting odds from Pinnacle Sports, Bet365, and the official tour rankings, and select the measurement with the most predictive power. Instead, we suggest improving these betting odds with a composite score than synthesizes the explanatory power from all three measurements. It is likely that certain measurements perform better among male or female matches, at specific tournaments, or during certain years.This composite score should permit more nuance and will be a more accurate estimate of the player's skill entering a match.
+
+It is likely that the players' skill entering a match is a stochastic process that varies from match to match. Ideally, the players' true skill entering a match randomly deviates from the betting odd's estimated skill. We suggest introducing a method that estimates and accounts for this potential deviation. Perhaps a hierarchical model (Royle & Dorazio, 2008) would resolve this problem. If successful, this will help to preserve momentum's true relationships and discover more nuanced associations.
+
+By construction, our measurements of backward and future momentum are highly autocorrelative. As it should be, a player's momentum at point *t* is highly related to his or her momentum at point *t+1*, regardless of the results at *t*. Thus, while the error structure of our models are linear and homoscedastic, it has a high autocorrelation. We suggest implementing an autoregressive error structure to account for the high autocorrelation among the residuals.
+
+Now, we suggest three minor modifications on our method for measuring momentum. First, we adjust the point margin curve for the server of the match with the match's serve impact. This assumes that the value of serving is constant throughout an entire match. This assumption suffices for our purposes, but a more complex method may further improve our computation of momentum. Ideally, the server should have no association with backward or future momentum. Second, we smoothed the point margin curve with our smoothing parameter, $\alpha$, at 0.1. It would be helpful to compare our results with different values of $alpha$. We do not anticipate large shifts, and this robustness check will strengthen our conclusions. It may also shed light on the ideal value of the $alpha$ parameter. Second, we use a simple secant line to approximate the forward and backward derivatives. A more complex backward and forward differentiation method may provide a more accurate measurement of momentum.
+
+# Future Work
+
+There is still much left to do and many questions left unanswered on the holistic effect of momentum in professional tennis. Ideally, this paper serves as introductory study that ushers in a wave of research on the magnitude and importance of momentum within a tennis match.
+
+## Next Steps
+
+For verification of the results, we suggest a simulation study that produces a series of matches with various pre-determined win-rates. These matches will be tantamount to random-walks with a drift. The outcomes of the points in the simulated matches should be completely random. That is, there should be no momentum effect present. Then, one can apply the same methods and models in this study to the simulated matches and compare the results. If no meaningful momentum effect is discovered among the simulated matches, then our results will be verified. Otherwise, if the results are comparable, then our conclusions will be seriously brought into question.
+
+Our measurements of backward momentum add value to existing in-match predictions that assume tennis points are identically distributed (Klaasen & Magnus, 2001). In the future, these- or improved- measurements of backward momentum may be utilized in machine learning models that predict the results of matches as they progress.
+
+Within a tennis match, certain points have a larger impact (or leverage) on the outcome of the match than others. It is reasonable to conclude that players afford differing levels of effort and mental energy to various points, depending on the points' leverage. Perhaps, this increased focus amplifies a point's impact on future momentum. One could develop a measurement for leverage and assess the relationship between a point's leverage and the future momentum of the match.
+
+Moreover, we hypothesize that momentum behaves differently at different levels of tournaments and among different age groups. This study focuses specifically at professional players competing at the highest levels. Perhaps these same players will experience different momentum effects at lower-level (and less consequential) tournaments. Moreover, little research has been conducted to assess the momentum effect in college or youth tennis. Are younger players more prone to the momentum effect? Do experienced players learn to harness or ignore momentum?
+
+## Other Methods
+
+In this study, we make the large and rather incorrect assumption that all players (of the same sex) experience momentum in identical ways and sizes. Our model's coefficients report the average effects felt among all sampled players. We suggest implementing a random effects model (Gelman & Hill, 2007) that adjusts the effects of momentum for each player. These nuanced and interactive results may shed light on the types of players that are more or less prone to the momentum effect. Additionally, it may be beneficial to categorize players into pre-determined player types before this analysis (Skinner, 2023). This will drastically reduce both the number of levels in the random effects model and the model's variability.
+
+Momentum is a force that gradually builds with a series of successes and slowly diminishes as time passes. This concept fits with a self-exciting spatio-temporal point process model (Reinhart, 2017). One could analyze momentum as a force that effects itself and changes as an explicit function of time. Under this paradigm, events compound to form momentum and are entirely related. In our model, we found no significant association between momentum and the length of points, but it is possible that winning long points is a *self-exciting process*. Perhaps winning one long point produces negligible momentum, but winning four in a row creates a significant effect. Additionally, as a function of time, a self-exciting model may prove useful in the understanding the effects of interruptions in play on momentum.
+
+# Conclusion
+
+In response to several studies that identify evidence for momentum in professional tennis in specific situations, this paper proposes a comprehensive definition for a player's momentum in a match. Momentum is the players' instantaneous point win rate at any point during the match. We utilize two estimations for the momentum: the backward momentum and future momentum. The backward momentum describes a players' momentum entering a point. We estimate the backward momentum with the backward approximation of the exponentially smoothed point-margin curve. The future momentum gauges the trajectory of the match after a point. The future momentum is estimated with the forward approximation of the forward exponentially smoothed point-margin curve.
+
+With these measurements, we evaluate the relationship between the players' past performance on their odds of winning the next point. Namely, we use a logistic regression to assess the relationship between backward momentum and the victor of the next point. While controlling for several structural variables, we find that a half-unit increase in a player's backward momentum tends to increase a player's odds of winning a point by 8.03%. While significant for both men and women, this effect size is larger for men (9.85%) than women (5.31%).
+
+Secondly, we assess the impact of various factors on the future trajectory of a match. As a whole, our results confirm and synthesize the findings of established peer-reviewed studies. We find that winning points, games, and sets tend to increase a player's future momentum. The more significant the victory, the larger the expected increase in future momentum. Players tend to experience an increase in future momentum after converting a break point and striking an ace. An interruption in play tends to diminish the effect of winning on future momentum. As a rule, these effect sizes are larger for men than women. Many of these findings are not unique to momentum literature, but this is the first study that integrates the effects into one model.
+
+We conclude that momentum does exist in professional tennis. That is, the outcome of points in a tennis match are not independent, and past results do have impact on future results. However, it is important to acknowledge that many factors impact the outcome of a tennis point, and the momentum effect is often less than one would initially expect. Moreover, we can conclude that both important and memorable events tend to impact a player's future momentum. Important match landmarks (like winning a game, set, or breaking serve) tend to increase a player's future performance, while memorable events (like aces and winners) can serve as catalysts of momentum that spur on future success. Conversely, as time progresses, the effect of past events on future results tends to diminish. Altogether, these discoveries uncover pieces of the complex relationship between past and future performance.
