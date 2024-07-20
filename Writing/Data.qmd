@@ -280,7 +280,8 @@ ps_fit
 ranking_fit <- lr_mod %>%
   fit(match_victor ~ rank_diff, data = bet_analysis)
 
-ranking_pred <- predict(ranking_fit, new_data = bet_analysis %>% select(-match_victor), type = "prob")
+ranking_pred <- predict(ranking_fit, new_data = bet_analysis %>% 
+                          select(-match_victor), type = "prob")
 
 # 9411 AIC
 ranking_fit

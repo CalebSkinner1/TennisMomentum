@@ -1057,7 +1057,7 @@ derivative_tibble <- function(df, alpha, order){
 wimbledon_derivatives <- gs %>% filter(year == 2023, tournament == "wimbledon") %>%
   derivative_tibble(alpha = .10, order = 1)
 
-full_derivatives <- gs %>% #filter(year == 2023) %>%
+full_derivatives <- gs %>% # filter(year == 2023) %>%
   derivative_tibble(alpha = .10, order = 1)
 
 together <- gs %>%
