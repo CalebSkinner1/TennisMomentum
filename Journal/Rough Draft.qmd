@@ -1,0 +1,140 @@
+---
+title: "Rough"
+author: "Caleb Skinner"
+format: pdf
+---
+
+```{r}
+library("tidyverse")
+library("arrow")
+library("flextable")
+library("here")
+library("tidymodels")
+library("janitor")
+```
+
+
+```{r}
+# Literature Review -------------------------------------------------------
+
+# - research that finds momentum does not exist
+
+# - momentum findings in sports (easier to isolate in simpler matches)
+# - tennis's repetition is suited for study
+# - some important findings in tennis
+```
+
+"He is feeling hot today"; "she is a streaky shooter"; "the team has seized the momentum." In modern sports culture, individuals liberally attribute results to the momentum effect. These phrases are prevalent in expert analysis, colloquial commentary, and even accounts from the players themselves. But what if these conclusions are overblown? In a landmark study, Gilovich, Vallone, & Tversky (1985) find no evidence for momentum in professional basketball players' shooting even though both fans and players expect past results to be correlated with future results. Several studies affirm this conclusion and find no evidence for momentum in baseball (Albright, 1989; Gould, 1989) and basketball (Vergin, 2000). Casual observers are merely poor “intuitive statisticians” who struggle to distinguish true patterns from spurious correlation (Kahneman, 2011).
+
+DEFINE MOMENTUM HERE?
+
+However, researchers have found more success identifying momentum in controlled repetitive environments. For example, Smith (2003) finds a “hot hand” effect in horseshoe pitchers. He argues that horseshoe competitions have many structural properties that eliminate confounding variables present in other sports. The short duration between pitches and little strategic complications play a large part in the findings. In a similarly simple game, Dorsey-Palmateer & Smith (2004) found evidence for streakiness in bowling. They found that bowlers are more likely to roll a strike after a series of strikes than a series of non-strikes. Moreover, Shea (2013) finds evidence for streakiness in professional basketball’s three-point contests and professional baseball’s home run derby. In all three studies, momentum is identified when a single player performs a repeated action with an static objective. 
+
+Recently, papers have found evidence for momentum in more complex situations. Jane (2023) posits these findings are a direct result of increased access to large data sets. Raab, Gula, & Gigerenzer (2012) find evidence for streakiness in half of the volleyball players in their study and conclude that the hot hand effect exists in volleyball. An analysis of the change in win probability in professional football indicates that team’s possessions are dependent and that long streaks of successful drives are more likely than randomness would suggest (Roebber, Burlingame, & deWinter, 2022). In a challenge to Gilovich, Vallone, & Tversky’s foundational paper, Jane (2023) finds evidence for a hot hand on free throw attempts in professional basketball.
+
+The game of tennis holds incredible value for momentum researchers because of its simple and repetitive structure. Players are continually exposed to the same conditions and are not subject to the complex interactions and strategic decisions that impact the dynamic of many team sports (Sarcevic, Vranic, & Pintar, 2021). In addition, tennis has been described as a best-of-n and tug-of-war game (Gauriot & Page, 2019). This hierarchical scoring structure makes it easier to identify asymmetric incentives between the players and assess momentum. In singles, there are always two possible outcomes and two players. This provides two significant empirical advantages. First, after each point in the match, one player always inches closer to his or her goal in a measurable way. There are no neutral outcomes. Second, the same two players compete for the entire duration of the match. This makes it possible to adjust for any inequality in skill between the two players in a more controlled fashion. These structural benefits and the abundance of available data have made tennis to be an ideal sport to analyze the presence of momentum.
+
+Klaasen & Magnus (2001) delivered the first major contribution towards momentum literature in tennis with the conclusion that the results of points at Wimbledon are not independent and identically distributed. While controlling for the quality of the players, they find that winning the previous point positively impacts players chances of winning the subsequent point. However, they concluded that the deviation is small enough that researchers can safely assume the points are independent and identically distributed.
+
+Others have noticed that not all points in tennis carry the same weight. In his famous book *Winning Ugly*, famous tennis coach Brad Gilbert argues that “specific points and games” have an outsized impact “on the momentum and outcome of the match” (Gilbert & Jamison, 2013). These uniquely impactful points then have a potential to be exploited by researchers to assess their momentum effect. Page & Coates (2017) assessed the effect of long tiebreaks in the first set on future sets. The two players end these sets having played about 78 points, but the outcomes of sets with long tiebreaks are ultimately decided by only two points. Thus, after the set’s conclusion, the two players will have won about the same amount of points, but one player will have emerged with a massive strategic and psychological advantage. In men’s matches, they find that in first set tiebreaks lasting longer than 20 points, the winner of the first set has a 60% chance of winning the second set. They conclude that winning a close set produces momentum.
+
+Similarly, Gauriot & Page (2019) assess the effect of shots landing close to lines on future points. If a player hits a ball that lands one centimeter outside the line, he or she is guaranteed to lose the point, but if the player hits a ball that lands one centimeter in, he or she has a positive probability of winning the point. Thus, within these few centimeters there is a large discontinuity in the outcome of the point. In men’s matches, they find that shots close to lines give players a higher chance to win the next point. Interestingly, this effect increases when the game score is tied or near its conclusion and falls when the score is asymmetric. Gauriot & Page (2019) conclude that the effect is strongest when the match is close and nearing its end.
+
+Meier et al. (2020) exploit the hierarchical structure of tennis by assessing the effect of breaking the opponent’s serve on future points. Breaks of serve are uncommon and often sufficient in determining the winner of a set (Klaasen & Magnus, 2001). A server’s chance of winning his service game increases by almost 9 percentage points after a break (Meier et al., 2020). However, if players are interrupted by a changeover in between the break and the subsequent service game, the effect is drastically decreased.
+
+Overall, several studies find a larger momentum effect in men than in women. Depken, Gandar, & Shapiro (2022) analyze the set-level momentum effects and find significant differences in male and female responses in sets one and two of a best-of-three set match. Page & Coates (2017) found a winner effect in men’s players after winning a close tiebreak, but they failed to find a winner effect for women. Gauriot & Page (2019) also fail to find any significant patterns for women’s matches after a shot lands close to the line. They, however, leave open the possibility that momentum exists in women’s tennis. This distinction between male and female contributors aligns with conclusions from other fields (Cohen-Zada, Krumer, & Shtudiner, 2017) and fits with physiological explanations derived from the biological framework (Bezuglov et al., 2023).
+
+```{r}
+# Modeling Trend in a Match -----------------------------------------------
+# first model, plot residuals
+# smooth
+# compute backward derivative
+```
+
+```{r}
+# Results -----------------------------------------------------------------
+
+gs2 <- gs %>%
+  mutate(
+    lag_gradient_backward_a10 = lag(gradient_backward_a10),
+    lag_gradient_backward_a15 = lag(gradient_backward_a15),
+    lag_gradient_backward_a20 = lag(gradient_backward_a20)) %>%
+  select(-gradient_backward_a10, -gradient_backward_a15, -gradient_backward_a20) %>%
+  filter(!is.na(lag_gradient_backward_a10), point_no > 5)
+
+# exist_momentum_men <- lr_mod %>%
+#   fit(point_victor ~ tournament:server:sex + lag_gradient_backward_a10:sex + lag_gradient_backward_a10 + b365_1_prob*sex, data = gs2)
+# 
+# exist_momentum_women <- lr_mod %>%
+#   fit(point_victor ~ tournament:server:sex + lag_gradient_backward_a10:sex + lag_gradient_backward_a10 + b365_1_prob*sex, data = gs2)
+# 
+# exist_momentum_combined <- lr_mod %>%
+#   fit(point_victor ~ tournament:server + lag_gradient_backward_a10 + b365_1_prob, data = gs2)
+
+exist_momentum_men <- lr_mod %>%
+  fit(point_victor ~ tournament:server:sex + lag_gradient_backward_a10:sex + lag_gradient_backward_a10 + b365_1_prob, data = gs2)
+
+gs3 <- gs2 %>% mutate(sex = factor(if_else(sex == "1", 0, 1)))
+
+exist_momentum_women <- lr_mod %>%
+  fit(point_victor ~ tournament:server:sex + lag_gradient_backward_a10:sex + lag_gradient_backward_a10 + b365_1_prob, data = gs3)
+
+exist_momentum_combined <- lr_mod %>%
+  fit(point_victor ~ tournament:server + lag_gradient_backward_a10 + b365_1_prob, data = gs2)
+
+prep_table <- function(fit, name, multiplier){
+  fit %>%
+    tidy() %>%
+    clean_names() %>%
+    select(-statistic) %>%
+    filter(!str_detect(term, "tournament")) %>%
+    mutate(
+      `2.5%` = exp(estimate * multiplier - 1.96*std_error*multiplier),
+      odds_ratio = exp(estimate * multiplier),
+      `97.5%` = exp(estimate * multiplier + 1.96*std_error*multiplier),
+      across(where(is.numeric), ~round(.x, digits = 4))) %>%
+    slice(1:3) %>%
+    mutate(term = c("Intercept", "backward trend", "bet_odds")) %>%
+    select(-estimate, -std_error, -p_value) %>%
+    rename_with(~paste0(name, "_", .x), .cols = everything())
+}
+
+prep_log_table <- function(men_fit, women_fit, combined_fit, multiplier){
+  em_men <- men_fit %>%
+    prep_table("men", multiplier) %>%
+    select(-contains("term"))
+  
+  em_women <- women_fit %>%
+    prep_table("women", multiplier) %>%
+    select(-contains("term"))
+  
+  combined_fit %>%
+    prep_table("combined", multiplier) %>%
+    bind_cols(em_men) %>%
+    bind_cols(em_women) %>%
+    rename("term" = "combined_term") %>%
+    mutate(
+      term = str_replace_all(term, "_", " "),
+      term = str_to_title(term),
+      term = recode(term,
+                    "Bet Odds" = "Pre-Match Win Probability")) %>%
+    rename_with(str_to_title)
+}
+
+prep_log_table(exist_momentum_men, exist_momentum_women, exist_momentum_combined, 1) %>%
+  flextable() %>%
+  add_header_row(
+    values = c("", "Combined", "Men", "Women"),
+    colwidths = c(1, 3, 3, 3), top = TRUE) %>%
+  set_header_labels(values = c("Term", "2.5%", "Odds Ratio", "97.5%", "2.5%", "Odds Ratio", "97.5%", "2.5%", "Odds Ratio", "97.5%")) %>%
+  align(align = "center", part = "all")
+
+# logistic regression
+# men and women
+```
+
+```{r}
+# Discussion --------------------------------------------------------------
+# talk about results
+```
+

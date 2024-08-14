@@ -22,6 +22,7 @@ lr_mod <- logistic_reg() %>%
 # Literature Review -------------------------------------------------------
 
 # - research that finds momentum does not exist
+
 # - 3 momentum frameworks
 # - momentum findings in sports (easier to isolate in simpler matches)
 # - tennis's repetition is suited for study
