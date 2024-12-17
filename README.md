@@ -19,3 +19,6 @@ The files also capture the descriptive analysis of the data and model the result
 
 ## Writing
 These documents piece together the final thesis I wrote and submitted to Baylor in Spring of 2024.
+
+## References
+Data has been acquired and compiled by [Jeff Sackmann](https://github.com/JeffSackmann/tennis_atp).
