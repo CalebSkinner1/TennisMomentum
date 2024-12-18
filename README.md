@@ -18,7 +18,7 @@ These files hold the code I used to compute (with first and second order gradien
 The files also capture the descriptive analysis of the data and model the results.
 
 ## Writing
-These documents piece together the final thesis I wrote and submitted to Baylor in Spring of 2024.
+This is the final thesis I wrote and submitted to the Baylor Honors College in Spring of 2024.
 
 ## References
 Data has been acquired and compiled by [Jeff Sackmann](https://github.com/JeffSackmann/tennis_atp).
